@@ -83,9 +83,9 @@ export async function fetchBloombergNews(): Promise<NewsItem[]> {
         return directResult;
     }
 
-    // 2. フォールバック: Google News RSS 経由
-    console.log('Bloomberg direct access failed, falling back to Google News RSS...');
-    return fetchBloombergViaGoogleNews();
+    // 2. フォールバック: Bloomberg Sitemap 経由
+    console.log('Bloomberg direct access failed, falling back to Sitemap...');
+    return fetchBloombergViaSitemap();
 }
 
 async function fetchBloombergDirect(): Promise<NewsItem[]> {
@@ -160,16 +160,15 @@ async function fetchBloombergDirect(): Promise<NewsItem[]> {
 }
 
 /**
- * Google News RSS 経由で Bloomberg Japan の記事を取得（フォールバック用）
+ * Bloomberg 公式のニュースサイトマップ経由で記事を取得（403フォールバック用）
  */
-async function fetchBloombergViaGoogleNews(): Promise<NewsItem[]> {
+async function fetchBloombergViaSitemap(): Promise<NewsItem[]> {
     try {
-        // ニュース記事URLに限定した検索クエリ + 株価ページを除外 + 直近1日間に限定
-        const rssUrl = 'https://news.google.com/rss/search?q=site:bloomberg.co.jp/news/articles+-"Stock+Price+Quote"+-"Quote+-"+when:1d&hl=ja&gl=JP&ceid=JP:ja';
-        const response = await axios.get(rssUrl, {
+        const sitemapUrl = 'https://www.bloomberg.co.jp/feeds/cojp/sitemap_news.xml';
+        const response = await axios.get(sitemapUrl, {
             headers: {
-                'User-Agent': USER_AGENT,
-                'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+                'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+                'Accept': 'application/xml, text/xml, */*',
             },
             timeout: 10000,
         });
@@ -178,60 +177,38 @@ async function fetchBloombergViaGoogleNews(): Promise<NewsItem[]> {
         const news: NewsItem[] = [];
         const now = new Date();
 
-        // 株価・マーケットデータページを除外するパターン
-        const MARKET_DATA_PATTERNS = [
-            /Stock Price Quote/i,
-            /\bQuote\s*[-–—]/i,
-            /ETF Fund$/i,
-            /Index Quote/i,
-            /Bond Quote/i,
-            /Futures Quote/i,
-            /^\d{4}:/,           // "2408: 南亜科技..." のような銘柄コードで始まるもの
-            /^[A-Z]{2,5}\s*Quote/i, // "FANG Quote" のようなティッカーで始まるもの
-        ];
-
-        $('item').each((_, element) => {
+        $('url').each((_, element) => {
             const el = $(element);
-            let title = el.find('title').text().trim();
-            const link = el.find('link').text().trim();
-            const pubDate = el.find('pubDate').text().trim();
+            const title = el.find('news\\:title').text() || el.find('title').text();
+            const link = el.find('loc').text();
+            const pubDateStr = el.find('news\\:publication_date').text() || el.find('lastmod').text();
 
-            if (!title || !link) return;
+            if (!title || !link || title === 'No Title') return;
 
-            // Google News のタイトルから " - Bloomberg" サフィックスを除去
-            title = title.replace(/\s*[-–—]\s*Bloomberg.*$/i, '').trim();
-
-            if (title.length < 10) return;
-            if (isNoisyTitle(title)) return;
-
-            // 株価・マーケットデータページを除外
-            if (MARKET_DATA_PATTERNS.some(p => p.test(title))) return;
-
-            // 時刻を pubDate から取得（日本時間で表示）
+            // 24時間以上前の記事は除外
             let time = getJSTTimeString();
-            if (pubDate) {
+            if (pubDateStr) {
                 try {
-                    const d = new Date(pubDate);
-                    // 24時間以上前の記事は除外
+                    const d = new Date(pubDateStr);
                     if (now.getTime() - d.getTime() > 24 * 60 * 60 * 1000) return;
                     time = getJSTTimeString(d);
-                } catch { /* 現在時刻を使用 */ }
+                } catch { /* 現在時刻を維持 */ }
             }
 
-            if (!news.some(n => n.title === title)) {
+            if (!news.some(n => n.title === title || n.url === link)) {
                 news.push({
-                    title,
-                    url: link,
+                    title: title.trim(),
+                    url: link.trim(),
                     source: 'Bloomberg',
                     time,
                 });
             }
         });
 
-        console.log(`Bloomberg via Google News RSS: ${news.length} articles found`);
+        console.log(`Bloomberg via Sitemap: ${news.length} articles found`);
         return news.slice(0, 30);
     } catch (error: any) {
-        console.error('Bloomberg Google News RSS fallback failed:', error.message);
+        console.error('Bloomberg Sitemap fallback failed:', error.message);
         return [];
     }
 }
