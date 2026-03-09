@@ -61,7 +61,7 @@ export default function Home() {
 
     useEffect(() => {
         fetchNews();
-        const interval = setInterval(fetchNews, 5 * 60 * 1000);
+        const interval = setInterval(fetchNews, 15 * 60 * 1000); // 15分ごとに更新
         return () => clearInterval(interval);
     }, []);
 

@@ -12,6 +12,12 @@ export interface NewsItem {
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
+/** 日本時間で HH:MM 形式の時刻文字列を返す */
+function getJSTTimeString(date?: Date): string {
+    const d = date || new Date();
+    return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' });
+}
+
 /**
  * ノイズ除去: ナビゲーション、画像クレジット、UIテキストなどを除外する
  */
@@ -134,7 +140,7 @@ async function fetchBloombergDirect(): Promise<NewsItem[]> {
                 }
             }
 
-            let time = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            let time = getJSTTimeString();
             const timeEl = el.closest('article').find('time, [class*="time"], [class*="date"]');
             if (timeEl.length > 0) {
                 const extractedTime = timeEl.text().trim();
@@ -158,8 +164,8 @@ async function fetchBloombergDirect(): Promise<NewsItem[]> {
  */
 async function fetchBloombergViaGoogleNews(): Promise<NewsItem[]> {
     try {
-        // ニュース記事URLに限定した検索クエリ + 株価ページを除外
-        const rssUrl = 'https://news.google.com/rss/search?q=site:bloomberg.co.jp/news/articles+-"Stock+Price+Quote"+-"Quote+-"&hl=ja&gl=JP&ceid=JP:ja';
+        // ニュース記事URLに限定した検索クエリ + 株価ページを除外 + 直近1日間に限定
+        const rssUrl = 'https://news.google.com/rss/search?q=site:bloomberg.co.jp/news/articles+-"Stock+Price+Quote"+-"Quote+-"+when:1d&hl=ja&gl=JP&ceid=JP:ja';
         const response = await axios.get(rssUrl, {
             headers: {
                 'User-Agent': USER_AGENT,
@@ -201,12 +207,14 @@ async function fetchBloombergViaGoogleNews(): Promise<NewsItem[]> {
             // 株価・マーケットデータページを除外
             if (MARKET_DATA_PATTERNS.some(p => p.test(title))) return;
 
-            // 時刻を pubDate から取得
-            let time = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            // 時刻を pubDate から取得（日本時間で表示）
+            let time = getJSTTimeString();
             if (pubDate) {
                 try {
                     const d = new Date(pubDate);
-                    time = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                    // 24時間以上前の記事は除外
+                    if (now.getTime() - d.getTime() > 24 * 60 * 60 * 1000) return;
+                    time = getJSTTimeString(d);
                 } catch { /* 現在時刻を使用 */ }
             }
 
@@ -262,7 +270,7 @@ export async function fetchReutersNews(): Promise<NewsItem[]> {
 
             if (!news.some(n => n.url === url) && title.length > 10) {
                 // 時刻の取得
-                let time = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                let time = getJSTTimeString();
                 const timeEl = el.closest('[class*="media-object"], article, div').find('time, [class*="time"], [data-testid="Label"]');
                 if (timeEl.length > 0) {
                     const extractedTime = timeEl.first().text().trim();
@@ -336,7 +344,7 @@ export async function fetchCNNNews(): Promise<NewsItem[]> {
             }
 
             if (!news.some(n => n.url === url) && title.length > 10) {
-                const time = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                const time = getJSTTimeString();
 
                 news.push({
                     title,
