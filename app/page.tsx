@@ -10,6 +10,8 @@ import TopStory from '@/components/TopStory';
 import CompactNewsList from '@/components/CompactNewsList';
 import BookmarkList from '@/components/BookmarkList';
 import SourceToggle, { ALL_SOURCES } from '@/components/SourceToggle';
+import HistoryList from '@/components/HistoryList';
+import { saveToDailyHistory, getDailyHistory, DailyHistory } from '@/lib/history';
 
 interface NewsData {
     bloomberg: NewsItem[];
@@ -26,10 +28,13 @@ export default function Home() {
     const [activeCategory, setActiveCategory] = useState<NewsCategory>('all');
     const [bookmarks, setBookmarks] = useState<BookmarkedItem[]>([]);
     const [showBookmarks, setShowBookmarks] = useState(false);
+    const [showHistory, setShowHistory] = useState(false);
+    const [historyData, setHistoryData] = useState<DailyHistory[]>([]);
     const [activeSources, setActiveSources] = useState<Set<NewsSource>>(new Set(ALL_SOURCES));
 
     useEffect(() => {
         setBookmarks(getBookmarks());
+        setHistoryData(getDailyHistory());
     }, []);
 
     const bookmarkedUrls = useMemo(() => new Set(bookmarks.map(b => b.url)), [bookmarks]);
@@ -42,6 +47,11 @@ export default function Home() {
             const json = await res.json();
             setData(json);
             setLastUpdated(new Date().toLocaleTimeString('ja-JP'));
+            
+            // 取得した記事をローカル履歴に保存
+            const allFetched = [...(json.bloomberg || []), ...(json.reuters || []), ...(json.cnn || [])];
+            saveToDailyHistory(allFetched);
+            setHistoryData(getDailyHistory());
         } catch (error) {
             console.error(error);
         } finally {
@@ -140,15 +150,23 @@ export default function Home() {
                 <header className="mb-6 space-y-5">
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                         <div>
-                            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-white via-gray-200 to-gray-500 bg-clip-text text-transparent mb-1">
+                            <h1 className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-white via-gray-200 to-gray-500 bg-clip-text text-transparent mb-1">
                                 Vantage Point
                             </h1>
-                            <p className="text-[var(--text-secondary)] text-sm font-mono uppercase tracking-widest">
+                            <p className="text-[var(--text-secondary)] text-xs md:text-sm font-mono uppercase tracking-widest hidden md:block">
                                 Global Market Intelligence Dashboard
                             </p>
                         </div>
 
                         <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setShowHistory(true)}
+                                className="header-action-btn"
+                                title="過去の記事アーカイブ"
+                            >
+                                <span>🗓️</span>
+                            </button>
+
                             <button
                                 onClick={() => setShowBookmarks(true)}
                                 className="header-action-btn"
@@ -188,7 +206,7 @@ export default function Home() {
                     />
 
                     {/* Search */}
-                    <div className="relative max-w-xl">
+                    <div className="relative w-full max-w-xl">
                         <input
                             type="text"
                             placeholder="ヘッドラインを検索 (例: FX, 日銀, 利上げ)..."
@@ -241,11 +259,20 @@ export default function Home() {
                 )}
             </main>
 
+            {/* Bookmarks Modal */}
             {showBookmarks && (
                 <BookmarkList
                     bookmarks={bookmarks}
                     onUpdate={setBookmarks}
                     onClose={() => setShowBookmarks(false)}
+                />
+            )}
+
+            {/* History Modal */}
+            {showHistory && (
+                <HistoryList
+                    historyData={historyData}
+                    onClose={() => setShowHistory(false)}
                 />
             )}
         </>

@@ -84,9 +84,18 @@ export async function fetchBloombergNews(): Promise<NewsItem[]> {
         $('a').each((_, element) => {
             const el = $(element);
             const url = el.attr('href');
-            const title = el.text().trim();
+            let title = el.text().trim().replace(/\s+/g, ' ');
 
-            if (!url || !title) return;
+            // BloombergのDOM構造対策: aタグ内にカテゴリspanと実際のタイトルが混在している場合、特有のクラスから正確なタイトルを抽出
+            const specificTitleEl = el.find('h3, [class*="headline"], [class*="title"]').first();
+            if (specificTitleEl.length > 0) {
+                const specificTitle = specificTitleEl.text().trim().replace(/\s+/g, ' ');
+                if (specificTitle && specificTitle.length > 5) {
+                    title = specificTitle;
+                }
+            }
+
+            if (!url || !title || title.length < 10) return;
             if (isNoisyTitle(title)) return;
             if (url.includes('javascript') || url.includes('void')) return;
 
@@ -128,7 +137,7 @@ export async function fetchBloombergNews(): Promise<NewsItem[]> {
             }
         });
 
-        return news.slice(0, 15);
+        return news.slice(0, 30);
     } catch (error: any) {
         if (axios.isAxiosError(error)) {
             console.error('Error fetching Bloomberg news:', error.message, error.response?.status);
@@ -192,7 +201,7 @@ export async function fetchReutersNews(): Promise<NewsItem[]> {
             }
         });
 
-        return news.slice(0, 15);
+        return news.slice(0, 30);
     } catch (error) {
         console.error('Error fetching Reuters news:', error);
         return [];
@@ -258,7 +267,7 @@ export async function fetchCNNNews(): Promise<NewsItem[]> {
             }
         });
 
-        return news.slice(0, 15);
+        return news.slice(0, 30);
     } catch (error) {
         console.error('Error fetching CNN news:', error);
         return [];

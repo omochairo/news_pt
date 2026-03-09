@@ -347,7 +347,7 @@ a {
 }
 
 .compact-news-items {
-    max-height: 600px;
+    max-height: 1200px;
     overflow-y: auto;
 }
 
@@ -519,7 +519,7 @@ a {
    =========================== */
 @media (max-width: 768px) {
     .container {
-        padding: 0 16px;
+        padding: 0 12px;
     }
 
     .ticker-item {
@@ -533,5 +533,82 @@ a {
 
     .ticker-price {
         font-size: 12px;
+    }
+
+    /* ソーストグルをスクロール可能に */
+    .source-toggle-wrapper {
+        overflow-x: auto;
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    .source-toggle-wrapper::-webkit-scrollbar {
+        display: none;
+    }
+
+    .source-toggle-btn {
+        padding: 6px 12px;
+        font-size: 11px;
+    }
+
+    /* カテゴリタブのコンパクト化 */
+    .category-tab {
+        padding: 6px 10px;
+        font-size: 11px;
+    }
+
+    .category-tab-icon {
+        font-size: 12px;
+    }
+
+    /* ニュースリストの高さ制限を解除してスマホで全件表示 */
+    .compact-news-items {
+        max-height: none;
+    }
+
+    /* ブックマークボタンを常時表示（タッチデバイス） */
+    .bookmark-btn-compact {
+        opacity: 0.5;
+    }
+
+    /* ブックマークパネルをフル幅に */
+    .bookmark-panel {
+        max-width: 100%;
+    }
+
+    /* HistoryList のモバイル対応 */
+    .bookmark-overlay > .bookmark-panel {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 100vh;
+    }
+
+    /* 検索入力のモバイル対応 */
+    .search-input {
+        font-size: 16px; /* iOS でのオートズーム防止 */
+        padding: 10px 40px 10px 16px;
+    }
+
+    /* ヘッダーアクションボタン縮小 */
+    .header-action-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+    }
+}
+
+/* 小型スマホ対応 */
+@media (max-width: 480px) {
+    .container {
+        padding: 0 8px;
+    }
+
+    .category-tab {
+        padding: 5px 8px;
+        font-size: 10px;
+    }
+
+    .source-toggle-btn {
+        padding: 5px 10px;
+        font-size: 10px;
     }
 }
