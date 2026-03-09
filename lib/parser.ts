@@ -158,7 +158,8 @@ async function fetchBloombergDirect(): Promise<NewsItem[]> {
  */
 async function fetchBloombergViaGoogleNews(): Promise<NewsItem[]> {
     try {
-        const rssUrl = 'https://news.google.com/rss/search?q=site:bloomberg.co.jp+when:1d&hl=ja&gl=JP&ceid=JP:ja';
+        // ニュース記事URLに限定した検索クエリ + 株価ページを除外
+        const rssUrl = 'https://news.google.com/rss/search?q=site:bloomberg.co.jp/news/articles+-"Stock+Price+Quote"+-"Quote+-"&hl=ja&gl=JP&ceid=JP:ja';
         const response = await axios.get(rssUrl, {
             headers: {
                 'User-Agent': USER_AGENT,
@@ -170,6 +171,18 @@ async function fetchBloombergViaGoogleNews(): Promise<NewsItem[]> {
         const $ = cheerio.load(response.data, { xmlMode: true });
         const news: NewsItem[] = [];
         const now = new Date();
+
+        // 株価・マーケットデータページを除外するパターン
+        const MARKET_DATA_PATTERNS = [
+            /Stock Price Quote/i,
+            /\bQuote\s*[-–—]/i,
+            /ETF Fund$/i,
+            /Index Quote/i,
+            /Bond Quote/i,
+            /Futures Quote/i,
+            /^\d{4}:/,           // "2408: 南亜科技..." のような銘柄コードで始まるもの
+            /^[A-Z]{2,5}\s*Quote/i, // "FANG Quote" のようなティッカーで始まるもの
+        ];
 
         $('item').each((_, element) => {
             const el = $(element);
@@ -185,6 +198,9 @@ async function fetchBloombergViaGoogleNews(): Promise<NewsItem[]> {
             if (title.length < 10) return;
             if (isNoisyTitle(title)) return;
 
+            // 株価・マーケットデータページを除外
+            if (MARKET_DATA_PATTERNS.some(p => p.test(title))) return;
+
             // 時刻を pubDate から取得
             let time = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
             if (pubDate) {
@@ -194,9 +210,6 @@ async function fetchBloombergViaGoogleNews(): Promise<NewsItem[]> {
                 } catch { /* 現在時刻を使用 */ }
             }
 
-            // Google News のリダイレクトURLから元のBloomberg URLを取得する試み
-            // link は通常 https://news.google.com/rss/articles/... 形式
-            // 元のURLはデコードしないと取れないので、そのままリンクとして使用
             if (!news.some(n => n.title === title)) {
                 news.push({
                     title,
