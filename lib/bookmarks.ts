@@ -8,7 +8,7 @@ const STORAGE_KEY = 'vantage-point-bookmarks';
 export interface BookmarkedItem {
     url: string;
     title: string;
-    source: 'Bloomberg' | 'Reuters';
+    source: 'Bloomberg' | 'Reuters' | 'CNN';
     savedAt: string;
 }
 

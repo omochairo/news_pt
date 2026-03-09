@@ -36,7 +36,7 @@ export default function NewsCard({ item, index = 0 }: NewsCardProps) {
                     className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white uppercase tracking-wider"
                     style={{ 
                         backgroundColor: isBloomberg ? 'var(--accent-bloomberg)' : 'var(--accent-reuters)',
-                        boxShadow: `0 0 10px ${isBloomberg ? 'var(--accent-bloomberg)' : 'var(--accent-reuters)}44`
+                        boxShadow: `0 0 10px ${isBloomberg ? 'var(--accent-bloomberg)' : 'var(--accent-reuters)'}44`
                     }}
                 >
                     {item.source}
@@ -55,12 +55,12 @@ export default function NewsCard({ item, index = 0 }: NewsCardProps) {
                 <h3 className="text-lg font-semibold leading-snug mb-3 group-hover:text-white transition-colors line-clamp-2">
                     {item.title}
                 </h3>
- 
+  
                 {/* Description - Subtle fallback text */}
                 <p className="text-sm text-[var(--text-secondary)] line-clamp-2 mb-6 font-light leading-relaxed opacity-80">
                     Source: {item.source} Japan. Click to read the full market report and analysis on the official site.
                 </p>
- 
+  
                 {/* Footer - Stats & Action */}
                 <div className="mt-auto pt-4 border-t border-[var(--card-border)] flex items-center justify-between text-[10px] text-[var(--text-secondary)] font-mono uppercase tracking-widest">
                     <div className="flex items-center gap-4">
