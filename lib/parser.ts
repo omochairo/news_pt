@@ -65,7 +65,24 @@ function isNoisyTitle(title: string): boolean {
     return NOISE_PATTERNS.some(pattern => pattern.test(title));
 }
 
+/**
+ * Bloomberg Japan の記事を取得する
+ * 1. まず bloomberg.co.jp に直接アクセスを試みる
+ * 2. 403等でブロックされた場合は Google News RSS 経由でフォールバック
+ */
 export async function fetchBloombergNews(): Promise<NewsItem[]> {
+    // 1. 直接スクレイピングを試行
+    const directResult = await fetchBloombergDirect();
+    if (directResult.length > 0) {
+        return directResult;
+    }
+
+    // 2. フォールバック: Google News RSS 経由
+    console.log('Bloomberg direct access failed, falling back to Google News RSS...');
+    return fetchBloombergViaGoogleNews();
+}
+
+async function fetchBloombergDirect(): Promise<NewsItem[]> {
     try {
         const response = await axios.get('https://www.bloomberg.co.jp/', {
             headers: {
@@ -74,19 +91,18 @@ export async function fetchBloombergNews(): Promise<NewsItem[]> {
                 'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
                 'Cache-Control': 'max-age=0',
                 'Upgrade-Insecure-Requests': '1',
-            }
+            },
+            timeout: 8000,
         });
 
         const $ = cheerio.load(response.data);
         const news: NewsItem[] = [];
 
-        // Bloombergのリンクからニュース記事を抽出
         $('a').each((_, element) => {
             const el = $(element);
             const url = el.attr('href');
             let title = el.text().trim().replace(/\s+/g, ' ');
 
-            // BloombergのDOM構造対策: aタグ内にカテゴリspanと実際のタイトルが混在している場合、特有のクラスから正確なタイトルを抽出
             const specificTitleEl = el.find('h3, [class*="headline"], [class*="title"]').first();
             if (specificTitleEl.length > 0) {
                 const specificTitle = specificTitleEl.text().trim().replace(/\s+/g, ' ');
@@ -99,7 +115,6 @@ export async function fetchBloombergNews(): Promise<NewsItem[]> {
             if (isNoisyTitle(title)) return;
             if (url.includes('javascript') || url.includes('void')) return;
 
-            // ニュース記事URLかどうか判定
             const isNews =
                 url.includes('/news/articles/') ||
                 url.includes('/articles/') ||
@@ -119,7 +134,6 @@ export async function fetchBloombergNews(): Promise<NewsItem[]> {
                 }
             }
 
-            // 時刻の取得
             let time = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
             const timeEl = el.closest('article').find('time, [class*="time"], [class*="date"]');
             if (timeEl.length > 0) {
@@ -128,22 +142,75 @@ export async function fetchBloombergNews(): Promise<NewsItem[]> {
             }
 
             if (!news.some(n => n.url === fullUrl)) {
-                news.push({
-                    title,
-                    url: fullUrl,
-                    source: 'Bloomberg',
-                    time
-                });
+                news.push({ title, url: fullUrl, source: 'Bloomberg', time });
             }
         });
 
         return news.slice(0, 30);
     } catch (error: any) {
-        if (axios.isAxiosError(error)) {
-            console.error('Error fetching Bloomberg news:', error.message, error.response?.status);
-        } else {
-            console.error('Error fetching Bloomberg news:', error);
-        }
+        console.error('Bloomberg direct fetch failed:', error.message, error.response?.status || '');
+        return [];
+    }
+}
+
+/**
+ * Google News RSS 経由で Bloomberg Japan の記事を取得（フォールバック用）
+ */
+async function fetchBloombergViaGoogleNews(): Promise<NewsItem[]> {
+    try {
+        const rssUrl = 'https://news.google.com/rss/search?q=site:bloomberg.co.jp+when:1d&hl=ja&gl=JP&ceid=JP:ja';
+        const response = await axios.get(rssUrl, {
+            headers: {
+                'User-Agent': USER_AGENT,
+                'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+            },
+            timeout: 10000,
+        });
+
+        const $ = cheerio.load(response.data, { xmlMode: true });
+        const news: NewsItem[] = [];
+        const now = new Date();
+
+        $('item').each((_, element) => {
+            const el = $(element);
+            let title = el.find('title').text().trim();
+            const link = el.find('link').text().trim();
+            const pubDate = el.find('pubDate').text().trim();
+
+            if (!title || !link) return;
+
+            // Google News のタイトルから " - Bloomberg" サフィックスを除去
+            title = title.replace(/\s*[-–—]\s*Bloomberg.*$/i, '').trim();
+
+            if (title.length < 10) return;
+            if (isNoisyTitle(title)) return;
+
+            // 時刻を pubDate から取得
+            let time = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            if (pubDate) {
+                try {
+                    const d = new Date(pubDate);
+                    time = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                } catch { /* 現在時刻を使用 */ }
+            }
+
+            // Google News のリダイレクトURLから元のBloomberg URLを取得する試み
+            // link は通常 https://news.google.com/rss/articles/... 形式
+            // 元のURLはデコードしないと取れないので、そのままリンクとして使用
+            if (!news.some(n => n.title === title)) {
+                news.push({
+                    title,
+                    url: link,
+                    source: 'Bloomberg',
+                    time,
+                });
+            }
+        });
+
+        console.log(`Bloomberg via Google News RSS: ${news.length} articles found`);
+        return news.slice(0, 30);
+    } catch (error: any) {
+        console.error('Bloomberg Google News RSS fallback failed:', error.message);
         return [];
     }
 }
