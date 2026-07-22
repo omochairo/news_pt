@@ -4,6 +4,8 @@ import React from 'react';
 import { NewsItem, NewsSource } from '@/lib/parser';
 import { scoreImportance, IMPORTANCE_CONFIGS } from '@/lib/importance';
 import { categorizeArticle, getCategoryConfig } from '@/lib/categorizer';
+import { detectRelatedSymbol } from '@/lib/market-data';
+import Sparkline from './Sparkline';
 
 const SOURCE_COLORS: Record<NewsSource, string> = {
     Bloomberg: 'var(--accent-bloomberg)',
@@ -77,6 +79,13 @@ export default function TopStory({ item, onBookmark, isBookmarked }: TopStoryPro
                             ● {importanceConfig.label}
                         </span>
                     )}
+
+                    {/* Sparkline */}
+                    {(() => {
+                        const symbolData = detectRelatedSymbol(item.title);
+                        if (!symbolData) return null;
+                        return <Sparkline data={symbolData} />;
+                    })()}
 
                     {/* Time */}
                     <span className="ml-auto text-xs text-[var(--text-secondary)] font-mono">

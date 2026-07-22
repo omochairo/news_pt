@@ -4,6 +4,8 @@ import React from 'react';
 import { NewsItem, NewsSource } from '@/lib/parser';
 import { scoreImportance, IMPORTANCE_CONFIGS } from '@/lib/importance';
 import { categorizeArticle, getCategoryConfig } from '@/lib/categorizer';
+import { detectRelatedSymbol } from '@/lib/market-data';
+import Sparkline from './Sparkline';
 
 const SOURCE_COLORS: Record<NewsSource, string> = {
     Bloomberg: 'var(--accent-bloomberg)',
@@ -109,6 +111,17 @@ export default function CompactNewsList({ items, title, source, onBookmark, book
                                     <h4 className="text-sm font-medium leading-snug group-hover:text-white transition-colors line-clamp-2">
                                         {item.title}
                                     </h4>
+
+                                    {/* Sparkline (Market Impact) */}
+                                    {(() => {
+                                        const symbolData = detectRelatedSymbol(item.title);
+                                        if (!symbolData) return null;
+                                        return (
+                                            <div className="mt-2">
+                                                <Sparkline data={symbolData} compact />
+                                            </div>
+                                        );
+                                    })()}
                                 </a>
 
                                 {/* Bookmark button */}

@@ -4,10 +4,12 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { NewsItem, NewsSource } from '@/lib/parser';
 import { NewsCategory, categorizeArticle } from '@/lib/categorizer';
 import { addBookmark, removeBookmark, getBookmarks, isBookmarked as checkBookmarked, BookmarkedItem } from '@/lib/bookmarks';
+import { extractTrendKeywords, TrendKeyword } from '@/lib/keywords';
 import MarketTicker from '@/components/MarketTicker';
 import CategoryTabs from '@/components/CategoryTabs';
 import TopStory from '@/components/TopStory';
 import CompactNewsList from '@/components/CompactNewsList';
+import TerminalNewsGrid from '@/components/TerminalNewsGrid';
 import BookmarkList from '@/components/BookmarkList';
 import SourceToggle, { ALL_SOURCES } from '@/components/SourceToggle';
 import HistoryList from '@/components/HistoryList';
@@ -22,6 +24,9 @@ interface NewsData {
     updatedAt: string;
 }
 
+type ViewMode = 'modern' | 'terminal';
+const VIEWMODE_STORAGE_KEY = 'vantage-point-viewmode';
+
 export default function Home() {
     const [data, setData] = useState<NewsData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -33,11 +38,24 @@ export default function Home() {
     const [showHistory, setShowHistory] = useState(false);
     const [historyData, setHistoryData] = useState<DailyHistory[]>([]);
     const [activeSources, setActiveSources] = useState<Set<NewsSource>>(new Set(ALL_SOURCES));
+    const [viewMode, setViewMode] = useState<ViewMode>('modern');
 
     useEffect(() => {
         setBookmarks(getBookmarks());
         setHistoryData(getDailyHistory());
+
+        // ローカルストレージから表示モードを復元
+        const savedViewMode = localStorage.getItem(VIEWMODE_STORAGE_KEY) as ViewMode;
+        if (savedViewMode === 'terminal' || savedViewMode === 'modern') {
+            setViewMode(savedViewMode);
+        }
     }, []);
+
+    const toggleViewMode = () => {
+        const nextMode = viewMode === 'modern' ? 'terminal' : 'modern';
+        setViewMode(nextMode);
+        localStorage.setItem(VIEWMODE_STORAGE_KEY, nextMode);
+    };
 
     const bookmarkedUrls = useMemo(() => new Set(bookmarks.map(b => b.url)), [bookmarks]);
 
@@ -78,7 +96,6 @@ export default function Home() {
         setActiveSources(prev => {
             const next = new Set(prev);
             if (next.has(source)) {
-                // 最低1つは有効にする
                 if (next.size > 1) next.delete(source);
             } else {
                 next.add(source);
@@ -112,7 +129,6 @@ export default function Home() {
 
         const filtered = filterItems(all);
 
-        // 正確な日時順にソート（降順: 新しいもの順）
         return filtered.sort((a, b) => {
             if (a.isoDate && b.isoDate) {
                 return new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime();
@@ -123,7 +139,24 @@ export default function Home() {
         });
     }, [data, activeSources, filterItems]);
 
-    // カテゴリごとのカウント（アクティブソースのみ）
+    // 全アイテム一覧（トレンド抽出用）
+    const allRawItems = useMemo(() => {
+        if (!data) return [];
+        return [
+            ...(data.nikkei || []),
+            ...(data.minkabu || []),
+            ...(data.bloomberg || []),
+            ...(data.reuters || []),
+            ...(data.cnn || []),
+        ];
+    }, [data]);
+
+    // トレンドキーワード抽出
+    const trendKeywords: TrendKeyword[] = useMemo(() => {
+        return extractTrendKeywords(allRawItems, 10);
+    }, [allRawItems]);
+
+    // カテゴリごとのカウント
     const categoryCounts = useMemo(() => {
         const allRaw: NewsItem[] = [];
         if (data) {
@@ -157,6 +190,15 @@ export default function Home() {
         }
     };
 
+    // トレンドキーワードタップ時の切り替え
+    const handleKeywordClick = (word: string) => {
+        if (searchQuery === word) {
+            setSearchQuery('');
+        } else {
+            setSearchQuery(word);
+        }
+    };
+
     return (
         <>
             <MarketTicker />
@@ -173,7 +215,20 @@ export default function Home() {
                             </p>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+                            {/* View Mode Toggle Button */}
+                            <button
+                                onClick={toggleViewMode}
+                                className={`px-3 py-1.5 rounded-lg border font-mono text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                                    viewMode === 'terminal'
+                                        ? 'bg-[#00ff66]/10 text-[#00ff66] border-[#00ff66]/50 shadow-[0_0_12px_rgba(0,255,102,0.25)]'
+                                        : 'bg-[var(--card-bg)] text-gray-300 border-[var(--card-border)] hover:border-gray-500'
+                                }`}
+                                title="表示モード切替 (プロ仕様高密度ターミナル表示 / モダン表示)"
+                            >
+                                <span>{viewMode === 'terminal' ? '⚡ TERMINAL' : '📱 MODERN'}</span>
+                            </button>
+
                             <button
                                 onClick={() => setShowHistory(true)}
                                 className="header-action-btn"
@@ -220,20 +275,47 @@ export default function Home() {
                         onToggle={handleSourceToggle}
                     />
 
-                    {/* Search */}
-                    <div className="relative w-full max-w-xl">
-                        <input
-                            type="text"
-                            placeholder="ヘッドラインを検索 (例: FX, 日銀, 利上げ, 為替)..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="search-input"
-                        />
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]">
-                            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
+                    {/* Search & Trend Cloud */}
+                    <div className="space-y-2">
+                        <div className="relative w-full max-w-xl">
+                            <input
+                                type="text"
+                                placeholder="ヘッドラインを検索 (例: FX, 日銀, 利上げ, 為替)..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="search-input"
+                            />
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]">
+                                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </div>
                         </div>
+
+                        {/* Trend Keywords Cloud */}
+                        {trendKeywords.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap text-xs pt-1">
+                                <span className="text-xs font-mono font-bold text-amber-400 flex items-center gap-1 mr-1">
+                                    🔥 TRENDS:
+                                </span>
+                                {trendKeywords.map((kw) => {
+                                    const isSelected = searchQuery === kw.word;
+                                    return (
+                                        <button
+                                            key={kw.word}
+                                            onClick={() => handleKeywordClick(kw.word)}
+                                            className={`px-2.5 py-0.5 rounded-full text-xs transition-all font-mono ${
+                                                isSelected
+                                                    ? 'bg-amber-500 text-black font-bold shadow-[0_0_8px_rgba(245,158,11,0.5)]'
+                                                    : 'bg-[var(--card-bg)] text-gray-300 border border-[var(--card-border)] hover:border-amber-500/50 hover:text-amber-300'
+                                            }`}
+                                        >
+                                            #{kw.word}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     {/* Category Tabs */}
@@ -244,14 +326,22 @@ export default function Home() {
                     />
                 </header>
 
-                {/* Main content: Timeline */}
+                {/* Main content: Timeline (Switchable between Modern and Terminal) */}
                 {loading && !data ? (
                     <div className="space-y-4">
                         <div className="glass-panel h-64 loading-pulse" />
                         <div className="glass-panel h-48 loading-pulse" />
                         <div className="glass-panel h-48 loading-pulse" />
                     </div>
+                ) : viewMode === 'terminal' ? (
+                    /* TERMINAL HIGH-DENSITY MODE */
+                    <TerminalNewsGrid
+                        items={timelineItems}
+                        onBookmark={handleBookmark}
+                        bookmarkedUrls={bookmarkedUrls}
+                    />
                 ) : (
+                    /* MODERN CARD MODE */
                     <div className="space-y-6">
                         {/* Top Story */}
                         {topStory && (
