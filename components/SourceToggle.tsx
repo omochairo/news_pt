@@ -6,12 +6,13 @@ import { NewsSource } from '@/lib/parser';
 export const SOURCE_CONFIGS: Record<NewsSource, { label: string; color: string; icon: string }> = {
     Nikkei: { label: '日経新聞', color: 'var(--accent-nikkei)', icon: '📰' },
     MinkabuFX: { label: 'みんかぶFX', color: 'var(--accent-minkabu)', icon: '💱' },
+    Crypto: { label: '暗号資産', color: 'var(--accent-crypto)', icon: '₿' },
     Bloomberg: { label: 'Bloomberg', color: 'var(--accent-bloomberg)', icon: '📊' },
     Reuters: { label: 'Reuters', color: 'var(--accent-reuters)', icon: '🌐' },
     CNN: { label: 'CNN Japan', color: 'var(--accent-cnn)', icon: '📺' },
 };
 
-export const ALL_SOURCES: NewsSource[] = ['Nikkei', 'MinkabuFX', 'Bloomberg', 'Reuters', 'CNN'];
+export const ALL_SOURCES: NewsSource[] = ['Nikkei', 'MinkabuFX', 'Crypto', 'Bloomberg', 'Reuters', 'CNN'];
 
 interface SourceToggleProps {
     activeSources: Set<NewsSource>;
@@ -21,7 +22,7 @@ interface SourceToggleProps {
 export default function SourceToggle({ activeSources, onToggle }: SourceToggleProps) {
     return (
         <div className="source-toggle-wrapper">
-            <div className="source-toggle">
+            <div className="source-toggle flex-wrap">
                 {ALL_SOURCES.map((source) => {
                     const config = SOURCE_CONFIGS[source];
                     const isActive = activeSources.has(source);
