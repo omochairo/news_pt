@@ -13,17 +13,20 @@ export interface NewsItem {
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-/** ノイズタイトルの判定 */
+/** 株価・価格・為替レート・ETF・銘柄コード等のノイズパターン */
 const NOISE_PATTERNS = [
-    /Stock Price Quote/i,
-    /\bQuote\s*[-–—]/i,
-    /ETF Fund$/i,
-    /Index Quote/i,
-    /Bond Quote/i,
-    /Futures Quote/i,
-    /Exchange Rate$/i,
+    /Stock Price/i,
+    /Exchange Rate/i,
+    /Latest News \| Reuters/i,
+    /Latest News \| Bloomberg/i,
+    /\bQuote\b/i,
+    /\bFund\b/i,
+    /\bSubindex\b/i,
+    /Futures/i,
+    /YieldBOOST/i,
+    /BuyWrite/i,
     /^\d{4}:/,
-    /^[A-Z]{2,5}\s*Quote/i,
+    /^[A-Za-z0-9._%()^/:\-\s]+$/,  // 全て英数字・記号のみ（日本語が含まれない銘柄コード等）
     /^PR TIMES/i,
     /^広告/,
     /^AD:/i,
@@ -79,7 +82,6 @@ function parseRssXml(xmlData: string, defaultSource: NewsSource, titleCleaner?: 
     const $ = cheerio.load(xmlData, { xmlMode: true });
     const news: NewsItem[] = [];
 
-    // RSS 2.0 & RDF (<item>) / Atom (<entry>)
     const items = $('item, entry');
 
     items.each((_, el) => {
@@ -133,7 +135,7 @@ async function fetchFromGoogleNewsRss(query: string, source: NewsSource, cleanSu
             if (cleanSuffix) {
                 return title.replace(new RegExp(`\\s*[-–—]\\s*${cleanSuffix}.*$`, 'i'), '').trim();
             }
-            return title.replace(/\s*[-–—]\s*[^-–—]+$/, '').trim(); // 末尾のメディア名カット
+            return title.replace(/\s*[-–—]\s*[^-–—]+$/, '').trim();
         });
     } catch (error: any) {
         console.error(`Google News RSS fetch failed for ${source} (${query}):`, error.message);
@@ -170,28 +172,28 @@ async function fetchFromWorRdf(rdfUrls: string[], source: NewsSource): Promise<N
 
 /**
  * Bloomberg ニュース取得 (Google News RSS 経由)
+ * 「ブルームバーグ」キーワードで記事（ニュース）のみを抽出
  */
 export async function fetchBloombergNews(): Promise<NewsItem[]> {
-    const items = await fetchFromGoogleNewsRss('site:bloomberg.co.jp when:2d', 'Bloomberg', 'Bloomberg');
+    const items = await fetchFromGoogleNewsRss('ブルームバーグ when:2d', 'Bloomberg', 'Bloomberg.com');
     if (items.length > 0) return items.slice(0, 30);
 
-    // フォールバック: キーワード検索
-    return fetchFromGoogleNewsRss('Bloomberg ブルームバーグ when:2d', 'Bloomberg', 'Bloomberg');
+    return fetchFromGoogleNewsRss('ブルームバーグ ニュース when:2d', 'Bloomberg', 'Bloomberg');
 }
 
 /**
  * Reuters ニュース取得 (Google News RSS 経由)
+ * 「ロイター」キーワードで記事（ニュース）のみを抽出
  */
 export async function fetchReutersNews(): Promise<NewsItem[]> {
-    const items = await fetchFromGoogleNewsRss('site:jp.reuters.com when:2d', 'Reuters', 'ロイター');
+    const items = await fetchFromGoogleNewsRss('ロイター when:2d', 'Reuters', 'ロイター');
     if (items.length > 0) return items.slice(0, 30);
 
-    // フォールバック: キーワード検索
-    return fetchFromGoogleNewsRss('ロイター Reuters when:2d', 'Reuters', 'ロイター');
+    return fetchFromGoogleNewsRss('ロイター ニュース when:2d', 'Reuters', 'ロイター');
 }
 
 /**
- * CNN ニュース取得 (Google News RSS & CNN 公式 RSS)
+ * CNN ニュース取得
  */
 export async function fetchCNNNews(): Promise<NewsItem[]> {
     const items = await fetchFromGoogleNewsRss('site:cnn.co.jp when:2d', 'CNN', 'CNN.co.jp');
@@ -214,7 +216,6 @@ export async function fetchNikkeiNews(): Promise<NewsItem[]> {
 
     if (items.length > 0) return items.slice(0, 35);
 
-    // フォールバック: Google News RSS
     return fetchFromGoogleNewsRss('site:nikkei.com when:1d', 'Nikkei', '日本経済新聞');
 }
 
@@ -231,6 +232,5 @@ export async function fetchMinkabuFXNews(): Promise<NewsItem[]> {
 
     if (items.length > 0) return items.slice(0, 30);
 
-    // フォールバック: Google News RSS
     return fetchFromGoogleNewsRss('みんかぶ FX when:1d', 'MinkabuFX');
 }
