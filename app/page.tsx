@@ -13,6 +13,8 @@ import TerminalNewsGrid from '@/components/TerminalNewsGrid';
 import BookmarkList from '@/components/BookmarkList';
 import SourceToggle, { ALL_SOURCES } from '@/components/SourceToggle';
 import HistoryList from '@/components/HistoryList';
+import EconomicCalendar from '@/components/EconomicCalendar';
+import PWAInstallPrompt from '@/components/PWAInstallPrompt';
 import { saveToDailyHistory, getDailyHistory, DailyHistory } from '@/lib/history';
 
 interface NewsData {
@@ -37,6 +39,7 @@ export default function Home() {
     const [bookmarks, setBookmarks] = useState<BookmarkedItem[]>([]);
     const [showBookmarks, setShowBookmarks] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
+    const [showCalendar, setShowCalendar] = useState(false);
     const [historyData, setHistoryData] = useState<DailyHistory[]>([]);
     const [activeSources, setActiveSources] = useState<Set<NewsSource>>(new Set(ALL_SOURCES));
     const [viewMode, setViewMode] = useState<ViewMode>('modern');
@@ -234,6 +237,19 @@ export default function Home() {
                                 <span>{viewMode === 'terminal' ? '⚡ TERMINAL' : '📱 MODERN'}</span>
                             </button>
 
+                            {/* Economic Calendar Button */}
+                            <button
+                                onClick={() => setShowCalendar(true)}
+                                className="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 transition-colors font-semibold flex items-center gap-1 text-xs"
+                                title="経済指標・重要イベントカレンダー"
+                            >
+                                <span>📅</span>
+                                <span>経済カレンダー</span>
+                            </button>
+
+                            {/* PWA Install Prompt */}
+                            <PWAInstallPrompt />
+
                             <button
                                 onClick={() => setShowHistory(true)}
                                 className="header-action-btn"
@@ -383,6 +399,13 @@ export default function Home() {
                 <HistoryList
                     historyData={historyData}
                     onClose={() => setShowHistory(false)}
+                />
+            )}
+
+            {/* Economic Calendar Modal */}
+            {showCalendar && (
+                <EconomicCalendar
+                    onClose={() => setShowCalendar(false)}
                 />
             )}
         </>
