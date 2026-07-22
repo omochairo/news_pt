@@ -3,12 +3,14 @@
  * localStorage を使用してブラウザに保存
  */
 
+import { NewsSource } from './parser';
+
 const STORAGE_KEY = 'vantage-point-bookmarks';
 
 export interface BookmarkedItem {
     url: string;
     title: string;
-    source: 'Bloomberg' | 'Reuters' | 'CNN';
+    source: NewsSource;
     savedAt: string;
 }
 
