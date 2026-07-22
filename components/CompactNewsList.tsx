@@ -9,6 +9,8 @@ const SOURCE_COLORS: Record<NewsSource, string> = {
     Bloomberg: 'var(--accent-bloomberg)',
     Reuters: 'var(--accent-reuters)',
     CNN: 'var(--accent-cnn)',
+    Nikkei: 'var(--accent-nikkei)',
+    MinkabuFX: 'var(--accent-minkabu)',
 };
 
 interface CompactNewsListProps {

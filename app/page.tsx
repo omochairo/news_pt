@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { NewsItem, NewsSource } from '@/lib/parser';
-import { NewsCategory, categorizeArticle, CATEGORIES } from '@/lib/categorizer';
+import { NewsCategory, categorizeArticle } from '@/lib/categorizer';
 import { addBookmark, removeBookmark, getBookmarks, isBookmarked as checkBookmarked, BookmarkedItem } from '@/lib/bookmarks';
 import MarketTicker from '@/components/MarketTicker';
 import CategoryTabs from '@/components/CategoryTabs';
@@ -14,9 +14,11 @@ import HistoryList from '@/components/HistoryList';
 import { saveToDailyHistory, getDailyHistory, DailyHistory } from '@/lib/history';
 
 interface NewsData {
-    bloomberg: NewsItem[];
-    reuters: NewsItem[];
-    cnn: NewsItem[];
+    nikkei?: NewsItem[];
+    minkabu?: NewsItem[];
+    bloomberg?: NewsItem[];
+    reuters?: NewsItem[];
+    cnn?: NewsItem[];
     updatedAt: string;
 }
 
@@ -44,16 +46,22 @@ export default function Home() {
         try {
             const res = await fetch('/api/news');
             if (!res.ok) throw new Error('Failed to fetch');
-            const json = await res.json();
+            const json: NewsData = await res.json();
             setData(json);
             setLastUpdated(new Date().toLocaleTimeString('ja-JP'));
             
-            // 取得した記事をローカル履歴に保存
-            const allFetched = [...(json.bloomberg || []), ...(json.reuters || []), ...(json.cnn || [])];
+            // 取得した全記事をローカル履歴に保存
+            const allFetched = [
+                ...(json.nikkei || []),
+                ...(json.minkabu || []),
+                ...(json.bloomberg || []),
+                ...(json.reuters || []),
+                ...(json.cnn || []),
+            ];
             saveToDailyHistory(allFetched);
             setHistoryData(getDailyHistory());
         } catch (error) {
-            console.error(error);
+            console.error('Error fetching news:', error);
         } finally {
             setLoading(false);
         }
@@ -61,7 +69,7 @@ export default function Home() {
 
     useEffect(() => {
         fetchNews();
-        const interval = setInterval(fetchNews, 15 * 60 * 1000); // 15分ごとに更新
+        const interval = setInterval(fetchNews, 5 * 60 * 1000); // 5分ごとに更新
         return () => clearInterval(interval);
     }, []);
 
@@ -96,14 +104,19 @@ export default function Home() {
     const timelineItems = useMemo(() => {
         if (!data) return [];
         const all: NewsItem[] = [];
+        if (activeSources.has('Nikkei')) all.push(...(data.nikkei || []));
+        if (activeSources.has('MinkabuFX')) all.push(...(data.minkabu || []));
         if (activeSources.has('Bloomberg')) all.push(...(data.bloomberg || []));
         if (activeSources.has('Reuters')) all.push(...(data.reuters || []));
         if (activeSources.has('CNN')) all.push(...(data.cnn || []));
 
         const filtered = filterItems(all);
 
-        // 時間順にソート（降順: 新しいもの順）
+        // 正確な日時順にソート（降順: 新しいもの順）
         return filtered.sort((a, b) => {
+            if (a.isoDate && b.isoDate) {
+                return new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime();
+            }
             const timeA = a.time || '00:00';
             const timeB = b.time || '00:00';
             return timeB.localeCompare(timeA);
@@ -114,6 +127,8 @@ export default function Home() {
     const categoryCounts = useMemo(() => {
         const allRaw: NewsItem[] = [];
         if (data) {
+            if (activeSources.has('Nikkei')) allRaw.push(...(data.nikkei || []));
+            if (activeSources.has('MinkabuFX')) allRaw.push(...(data.minkabu || []));
             if (activeSources.has('Bloomberg')) allRaw.push(...(data.bloomberg || []));
             if (activeSources.has('Reuters')) allRaw.push(...(data.reuters || []));
             if (activeSources.has('CNN')) allRaw.push(...(data.cnn || []));
@@ -209,7 +224,7 @@ export default function Home() {
                     <div className="relative w-full max-w-xl">
                         <input
                             type="text"
-                            placeholder="ヘッドラインを検索 (例: FX, 日銀, 利上げ)..."
+                            placeholder="ヘッドラインを検索 (例: FX, 日銀, 利上げ, 為替)..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="search-input"
