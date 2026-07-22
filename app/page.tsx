@@ -21,6 +21,7 @@ interface NewsData {
     bloomberg?: NewsItem[];
     reuters?: NewsItem[];
     cnn?: NewsItem[];
+    crypto?: NewsItem[];
     updatedAt: string;
 }
 
@@ -72,6 +73,7 @@ export default function Home() {
             const allFetched = [
                 ...(json.nikkei || []),
                 ...(json.minkabu || []),
+                ...(json.crypto || []),
                 ...(json.bloomberg || []),
                 ...(json.reuters || []),
                 ...(json.cnn || []),
@@ -123,6 +125,7 @@ export default function Home() {
         const all: NewsItem[] = [];
         if (activeSources.has('Nikkei')) all.push(...(data.nikkei || []));
         if (activeSources.has('MinkabuFX')) all.push(...(data.minkabu || []));
+        if (activeSources.has('Crypto')) all.push(...(data.crypto || []));
         if (activeSources.has('Bloomberg')) all.push(...(data.bloomberg || []));
         if (activeSources.has('Reuters')) all.push(...(data.reuters || []));
         if (activeSources.has('CNN')) all.push(...(data.cnn || []));
@@ -145,6 +148,7 @@ export default function Home() {
         return [
             ...(data.nikkei || []),
             ...(data.minkabu || []),
+            ...(data.crypto || []),
             ...(data.bloomberg || []),
             ...(data.reuters || []),
             ...(data.cnn || []),
@@ -162,6 +166,7 @@ export default function Home() {
         if (data) {
             if (activeSources.has('Nikkei')) allRaw.push(...(data.nikkei || []));
             if (activeSources.has('MinkabuFX')) allRaw.push(...(data.minkabu || []));
+            if (activeSources.has('Crypto')) allRaw.push(...(data.crypto || []));
             if (activeSources.has('Bloomberg')) allRaw.push(...(data.bloomberg || []));
             if (activeSources.has('Reuters')) allRaw.push(...(data.reuters || []));
             if (activeSources.has('CNN')) allRaw.push(...(data.cnn || []));

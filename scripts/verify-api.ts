@@ -9,6 +9,7 @@ async function testApiRoute() {
     console.log('X-Cache Header:', res1.headers.get('X-Cache'));
     console.log('Nikkei Count:', data1.nikkei?.length);
     console.log('Minkabu Count:', data1.minkabu?.length);
+    console.log('Crypto Count:', data1.crypto?.length);
     console.log('Bloomberg Count:', data1.bloomberg?.length);
     console.log('Reuters Count:', data1.reuters?.length);
     console.log('CNN Count:', data1.cnn?.length);

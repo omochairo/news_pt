@@ -75,6 +75,7 @@ export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls }: 
                                                 item.source === 'Reuters' ? 'bg-amber-900/60 text-amber-300 border border-amber-700/50' :
                                                 item.source === 'Nikkei' ? 'bg-indigo-900/60 text-indigo-300 border border-indigo-700/50' :
                                                 item.source === 'MinkabuFX' ? 'bg-yellow-900/60 text-yellow-300 border border-yellow-700/50' :
+                                                item.source === 'Crypto' ? 'bg-orange-900/60 text-orange-300 border border-orange-700/50' :
                                                 'bg-red-900/60 text-red-300 border border-red-700/50'
                                             }`}
                                         >

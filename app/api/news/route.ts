@@ -5,6 +5,7 @@ import {
     fetchCNNNews,
     fetchNikkeiNews,
     fetchMinkabuFXNews,
+    fetchCryptoNews,
     NewsItem,
 } from '@/lib/parser';
 
@@ -15,6 +16,7 @@ interface CacheContainer {
         bloomberg: NewsItem[];
         reuters: NewsItem[];
         cnn: NewsItem[];
+        crypto: NewsItem[];
         updatedAt: string;
     };
     timestamp: number;
@@ -41,12 +43,13 @@ export async function GET(request: Request) {
 
     try {
         // 2. Promise.allSettled で一部が失敗しても全滅しないように取得
-        const [nikkeiRes, minkabuRes, bloombergRes, reutersRes, cnnRes] = await Promise.allSettled([
+        const [nikkeiRes, minkabuRes, bloombergRes, reutersRes, cnnRes, cryptoRes] = await Promise.allSettled([
             fetchNikkeiNews(),
             fetchMinkabuFXNews(),
             fetchBloombergNews(),
             fetchReutersNews(),
             fetchCNNNews(),
+            fetchCryptoNews(),
         ]);
 
         const result = {
@@ -55,6 +58,7 @@ export async function GET(request: Request) {
             bloomberg: bloombergRes.status === 'fulfilled' ? bloombergRes.value : [],
             reuters: reutersRes.status === 'fulfilled' ? reutersRes.value : [],
             cnn: cnnRes.status === 'fulfilled' ? cnnRes.value : [],
+            crypto: cryptoRes.status === 'fulfilled' ? cryptoRes.value : [],
             updatedAt: new Date().toISOString(),
         };
 
@@ -73,7 +77,6 @@ export async function GET(request: Request) {
     } catch (error) {
         console.error('API Error in /api/news:', error);
 
-        // エラーが発生した場合でも古いキャッシュがあればそれを返す
         if (memoryCache) {
             return NextResponse.json(memoryCache.data, {
                 headers: { 'X-Cache': 'STALE-FALLBACK' },

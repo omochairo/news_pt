@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
-export type NewsSource = 'Bloomberg' | 'Reuters' | 'CNN' | 'Nikkei' | 'MinkabuFX';
+export type NewsSource = 'Bloomberg' | 'Reuters' | 'CNN' | 'Nikkei' | 'MinkabuFX' | 'Crypto';
 
 export interface NewsItem {
     title: string;
@@ -233,4 +233,41 @@ export async function fetchMinkabuFXNews(): Promise<NewsItem[]> {
     if (items.length > 0) return items.slice(0, 30);
 
     return fetchFromGoogleNewsRss('みんかぶ FX when:1d', 'MinkabuFX');
+}
+
+/**
+ * 暗号資産 (Crypto / Web3) ニュース取得 (CoinPost & CoinDesk Japan RSS)
+ */
+export async function fetchCryptoNews(): Promise<NewsItem[]> {
+    const cryptoRssUrls = [
+        'https://coinpost.jp/?feed=rss2',
+        'https://www.coindeskjapan.com/feed/',
+    ];
+
+    const allItems: NewsItem[] = [];
+
+    for (const url of cryptoRssUrls) {
+        try {
+            const response = await axios.get(url, {
+                headers: { 'User-Agent': USER_AGENT },
+                timeout: 8000,
+            });
+
+            const parsed = parseRssXml(response.data, 'Crypto');
+            for (const item of parsed) {
+                if (!allItems.some(n => n.url === item.url || n.title === item.title)) {
+                    allItems.push(item);
+                }
+            }
+        } catch (error: any) {
+            console.error(`Crypto RSS fetch failed for ${url}:`, error.message);
+        }
+    }
+
+    if (allItems.length > 0) {
+        return allItems.slice(0, 30);
+    }
+
+    // フォールバック: Google News RSS
+    return fetchFromGoogleNewsRss('暗号資産 OR ビットコイン OR イーサリアム when:2d', 'Crypto');
 }

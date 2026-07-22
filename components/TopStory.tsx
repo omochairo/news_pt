@@ -13,6 +13,7 @@ const SOURCE_COLORS: Record<NewsSource, string> = {
     CNN: 'var(--accent-cnn)',
     Nikkei: 'var(--accent-nikkei)',
     MinkabuFX: 'var(--accent-minkabu)',
+    Crypto: 'var(--accent-crypto)',
 };
 
 interface TopStoryProps {
