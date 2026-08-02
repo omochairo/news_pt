@@ -5,11 +5,13 @@ import { NewsItem, NewsSource } from '@/lib/parser';
 import { NewsCategory, categorizeArticle } from '@/lib/categorizer';
 import { addBookmark, removeBookmark, getBookmarks, isBookmarked as checkBookmarked, BookmarkedItem } from '@/lib/bookmarks';
 import { extractTrendKeywords, TrendKeyword } from '@/lib/keywords';
+import { getReadUrls, markAsRead } from '@/lib/read-status';
 import MarketTicker from '@/components/MarketTicker';
 import CategoryTabs from '@/components/CategoryTabs';
 import TopStory from '@/components/TopStory';
 import CompactNewsList from '@/components/CompactNewsList';
 import TerminalNewsGrid from '@/components/TerminalNewsGrid';
+import SplitViewFeed from '@/components/SplitViewFeed';
 import BookmarkList from '@/components/BookmarkList';
 import SourceToggle, { ALL_SOURCES } from '@/components/SourceToggle';
 import HistoryList from '@/components/HistoryList';
@@ -27,7 +29,7 @@ interface NewsData {
     updatedAt: string;
 }
 
-type ViewMode = 'modern' | 'terminal';
+type ViewMode = 'modern' | 'terminal' | 'split';
 const VIEWMODE_STORAGE_KEY = 'vantage-point-viewmode';
 
 export default function Home() {
@@ -37,6 +39,7 @@ export default function Home() {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeCategory, setActiveCategory] = useState<NewsCategory>('all');
     const [bookmarks, setBookmarks] = useState<BookmarkedItem[]>([]);
+    const [readUrls, setReadUrls] = useState<Set<string>>(new Set());
     const [showBookmarks, setShowBookmarks] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
@@ -47,21 +50,25 @@ export default function Home() {
     useEffect(() => {
         setBookmarks(getBookmarks());
         setHistoryData(getDailyHistory());
+        setReadUrls(getReadUrls());
 
         // ローカルストレージから表示モードを復元
         const savedViewMode = localStorage.getItem(VIEWMODE_STORAGE_KEY) as ViewMode;
-        if (savedViewMode === 'terminal' || savedViewMode === 'modern') {
+        if (savedViewMode === 'terminal' || savedViewMode === 'modern' || savedViewMode === 'split') {
             setViewMode(savedViewMode);
         }
     }, []);
 
-    const toggleViewMode = () => {
-        const nextMode = viewMode === 'modern' ? 'terminal' : 'modern';
-        setViewMode(nextMode);
-        localStorage.setItem(VIEWMODE_STORAGE_KEY, nextMode);
+    const changeViewMode = (mode: ViewMode) => {
+        setViewMode(mode);
+        localStorage.setItem(VIEWMODE_STORAGE_KEY, mode);
     };
 
     const bookmarkedUrls = useMemo(() => new Set(bookmarks.map(b => b.url)), [bookmarks]);
+
+    const handleMarkRead = (url: string) => {
+        setReadUrls(markAsRead(url));
+    };
 
     const fetchNews = async () => {
         setLoading(true);
@@ -224,18 +231,36 @@ export default function Home() {
                         </div>
 
                         <div className="flex items-center gap-2 md:gap-3 flex-wrap">
-                            {/* View Mode Toggle Button */}
-                            <button
-                                onClick={toggleViewMode}
-                                className={`px-3 py-1.5 rounded-lg border font-mono text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                                    viewMode === 'terminal'
-                                        ? 'bg-[#00ff66]/10 text-[#00ff66] border-[#00ff66]/50 shadow-[0_0_12px_rgba(0,255,102,0.25)]'
-                                        : 'bg-[var(--card-bg)] text-gray-300 border-[var(--card-border)] hover:border-gray-500'
-                                }`}
-                                title="表示モード切替 (プロ仕様高密度ターミナル表示 / モダン表示)"
-                            >
-                                <span>{viewMode === 'terminal' ? '⚡ TERMINAL' : '📱 MODERN'}</span>
-                            </button>
+                            {/* View Mode Switcher */}
+                            <div className="flex items-center rounded-lg p-0.5 bg-[var(--card-bg)] border border-[var(--card-border)] font-mono text-xs">
+                                <button
+                                    onClick={() => changeViewMode('modern')}
+                                    className={`px-2.5 py-1 rounded-md transition-all ${
+                                        viewMode === 'modern' ? 'bg-blue-600 text-white font-bold shadow' : 'text-gray-400 hover:text-gray-200'
+                                    }`}
+                                    title="モダンカード表示"
+                                >
+                                    📱 MODERN
+                                </button>
+                                <button
+                                    onClick={() => changeViewMode('terminal')}
+                                    className={`px-2.5 py-1 rounded-md transition-all ${
+                                        viewMode === 'terminal' ? 'bg-[#00ff66]/20 text-[#00ff66] font-bold shadow border border-[#00ff66]/40' : 'text-gray-400 hover:text-gray-200'
+                                    }`}
+                                    title="プロ仕様高密度ターミナル表示"
+                                >
+                                    ⚡ TERMINAL
+                                </button>
+                                <button
+                                    onClick={() => changeViewMode('split')}
+                                    className={`px-2.5 py-1 rounded-md transition-all ${
+                                        viewMode === 'split' ? 'bg-amber-500/20 text-amber-300 font-bold shadow border border-amber-500/40' : 'text-gray-400 hover:text-gray-200'
+                                    }`}
+                                    title="画面分割マルチビュー"
+                                >
+                                    📑 DUAL VIEW
+                                </button>
+                            </div>
 
                             {/* Economic Calendar Button */}
                             <button
@@ -290,76 +315,92 @@ export default function Home() {
                         </div>
                     </div>
 
-                    {/* Source Toggle */}
-                    <SourceToggle
-                        activeSources={activeSources}
-                        onToggle={handleSourceToggle}
-                    />
-
-                    {/* Search & Trend Cloud */}
-                    <div className="space-y-2">
-                        <div className="relative w-full max-w-xl">
-                            <input
-                                type="text"
-                                placeholder="ヘッドラインを検索 (例: FX, 日銀, 利上げ, 為替)..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="search-input"
+                    {/* Single View Mode の場合の統合フィルター */}
+                    {viewMode !== 'split' && (
+                        <>
+                            {/* Source Toggle */}
+                            <SourceToggle
+                                activeSources={activeSources}
+                                onToggle={handleSourceToggle}
                             />
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]">
-                                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                            </div>
-                        </div>
 
-                        {/* Trend Keywords Cloud */}
-                        {trendKeywords.length > 0 && (
-                            <div className="flex items-center gap-1.5 flex-wrap text-xs pt-1">
-                                <span className="text-xs font-mono font-bold text-amber-400 flex items-center gap-1 mr-1">
-                                    🔥 TRENDS:
-                                </span>
-                                {trendKeywords.map((kw) => {
-                                    const isSelected = searchQuery === kw.word;
-                                    return (
-                                        <button
-                                            key={kw.word}
-                                            onClick={() => handleKeywordClick(kw.word)}
-                                            className={`px-2.5 py-0.5 rounded-full text-xs transition-all font-mono ${
-                                                isSelected
-                                                    ? 'bg-amber-500 text-black font-bold shadow-[0_0_8px_rgba(245,158,11,0.5)]'
-                                                    : 'bg-[var(--card-bg)] text-gray-300 border border-[var(--card-border)] hover:border-amber-500/50 hover:text-amber-300'
-                                            }`}
-                                        >
-                                            #{kw.word}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                            {/* Search & Trend Cloud */}
+                            <div className="space-y-2">
+                                <div className="relative w-full max-w-xl">
+                                    <input
+                                        type="text"
+                                        placeholder="ヘッドラインを検索 (例: FX, 日銀, 利上げ, 為替)..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="search-input"
+                                    />
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]">
+                                        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                    </div>
+                                </div>
 
-                    {/* Category Tabs */}
-                    <CategoryTabs
-                        activeCategory={activeCategory}
-                        onCategoryChange={setActiveCategory}
-                        counts={categoryCounts}
-                    />
+                                {/* Trend Keywords Cloud */}
+                                {trendKeywords.length > 0 && (
+                                    <div className="flex items-center gap-1.5 flex-wrap text-xs pt-1">
+                                        <span className="text-xs font-mono font-bold text-amber-400 flex items-center gap-1 mr-1">
+                                            🔥 TRENDS:
+                                        </span>
+                                        {trendKeywords.map((kw) => {
+                                            const isSelected = searchQuery === kw.word;
+                                            return (
+                                                <button
+                                                    key={kw.word}
+                                                    onClick={() => handleKeywordClick(kw.word)}
+                                                    className={`px-2.5 py-0.5 rounded-full text-xs transition-all font-mono ${
+                                                        isSelected
+                                                            ? 'bg-amber-500 text-black font-bold shadow-[0_0_8px_rgba(245,158,11,0.5)]'
+                                                            : 'bg-[var(--card-bg)] text-gray-300 border border-[var(--card-border)] hover:border-amber-500/50 hover:text-amber-300'
+                                                    }`}
+                                                >
+                                                    #{kw.word}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Category Tabs */}
+                            <CategoryTabs
+                                activeCategory={activeCategory}
+                                onCategoryChange={setActiveCategory}
+                                counts={categoryCounts}
+                            />
+                        </>
+                    )}
                 </header>
 
-                {/* Main content: Timeline (Switchable between Modern and Terminal) */}
+                {/* Main content: Timeline (Switchable between Modern, Terminal, and Split) */}
                 {loading && !data ? (
                     <div className="space-y-4">
                         <div className="glass-panel h-64 loading-pulse" />
                         <div className="glass-panel h-48 loading-pulse" />
                         <div className="glass-panel h-48 loading-pulse" />
                     </div>
+                ) : viewMode === 'split' ? (
+                    /* DUAL PANEL SPLIT VIEW MODE */
+                    <SplitViewFeed
+                        data={data}
+                        onBookmark={handleBookmark}
+                        bookmarkedUrls={bookmarkedUrls}
+                        readUrls={readUrls}
+                        onMarkRead={handleMarkRead}
+                    />
                 ) : viewMode === 'terminal' ? (
                     /* TERMINAL HIGH-DENSITY MODE */
                     <TerminalNewsGrid
                         items={timelineItems}
                         onBookmark={handleBookmark}
                         bookmarkedUrls={bookmarkedUrls}
+                        readUrls={readUrls}
+                        onMarkRead={handleMarkRead}
                     />
                 ) : (
                     /* MODERN CARD MODE */
@@ -370,6 +411,8 @@ export default function Home() {
                                 item={topStory}
                                 onBookmark={handleBookmark}
                                 isBookmarked={bookmarkedUrls.has(topStory.url)}
+                                isRead={readUrls.has(topStory.url)}
+                                onMarkRead={handleMarkRead}
                             />
                         )}
 
@@ -380,6 +423,8 @@ export default function Home() {
                             source="mixed"
                             onBookmark={handleBookmark}
                             bookmarkedUrls={bookmarkedUrls}
+                            readUrls={readUrls}
+                            onMarkRead={handleMarkRead}
                         />
                     </div>
                 )}

@@ -22,9 +22,19 @@ interface CompactNewsListProps {
     source: NewsSource | 'mixed';
     onBookmark?: (item: NewsItem) => void;
     bookmarkedUrls?: Set<string>;
+    readUrls?: Set<string>;
+    onMarkRead?: (url: string) => void;
 }
 
-export default function CompactNewsList({ items, title, source, onBookmark, bookmarkedUrls }: CompactNewsListProps) {
+export default function CompactNewsList({
+    items,
+    title,
+    source,
+    onBookmark,
+    bookmarkedUrls,
+    readUrls,
+    onMarkRead,
+}: CompactNewsListProps) {
     const accentColor = source === 'mixed' ? 'var(--accent-bloomberg)' : SOURCE_COLORS[source];
 
     return (
@@ -61,12 +71,13 @@ export default function CompactNewsList({ items, title, source, onBookmark, book
                         const category = categorizeArticle(item.title);
                         const catConfig = getCategoryConfig(category);
                         const isBm = bookmarkedUrls?.has(item.url);
+                        const isRead = readUrls?.has(item.url);
                         const itemColor = SOURCE_COLORS[item.source];
 
                         return (
                             <div
                                 key={`${item.url}-${index}`}
-                                className="compact-news-item group"
+                                className={`compact-news-item group transition-opacity ${isRead ? 'opacity-60 bg-black/20' : ''}`}
                                 style={importance !== 'normal'
                                     ? { borderLeft: `2px solid ${impConfig.color}` }
                                     : { borderLeft: `2px solid ${itemColor}22` }
@@ -76,6 +87,7 @@ export default function CompactNewsList({ items, title, source, onBookmark, book
                                     href={item.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
+                                    onClick={() => onMarkRead?.(item.url)}
                                     className="block px-5 py-3 hover:bg-white/[0.02] transition-colors"
                                 >
                                     {/* Top line: source + category + importance + time */}
@@ -103,13 +115,18 @@ export default function CompactNewsList({ items, title, source, onBookmark, book
                                                 {impConfig.label}
                                             </span>
                                         )}
+                                        {isRead && (
+                                            <span className="text-[9px] font-mono text-emerald-400/80 bg-emerald-950/40 px-1 rounded border border-emerald-800/30">
+                                                ✓ 既読
+                                            </span>
+                                        )}
                                         <span className="ml-auto text-[10px] text-[var(--text-secondary)] font-mono flex-shrink-0">
                                             {item.time || '--:--'}
                                         </span>
                                     </div>
 
                                     {/* Title */}
-                                    <h4 className="text-sm font-medium leading-snug group-hover:text-white transition-colors line-clamp-2">
+                                    <h4 className={`text-sm font-medium leading-snug transition-colors line-clamp-2 ${isRead ? 'text-gray-400 group-hover:text-gray-200' : 'text-gray-100 group-hover:text-white'}`}>
                                         {item.title}
                                     </h4>
 

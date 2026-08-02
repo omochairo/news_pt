@@ -11,9 +11,11 @@ interface TerminalNewsGridProps {
     items: NewsItem[];
     onBookmark?: (item: NewsItem) => void;
     bookmarkedUrls?: Set<string>;
+    readUrls?: Set<string>;
+    onMarkRead?: (url: string) => void;
 }
 
-export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls }: TerminalNewsGridProps) {
+export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls, readUrls, onMarkRead }: TerminalNewsGridProps) {
     return (
         <div className="terminal-grid-wrapper glass-panel border border-[#00ff66]/30 font-mono text-xs overflow-x-auto">
             <div className="bg-[#0c1017] px-4 py-2 border-b border-[#00ff66]/20 flex items-center justify-between text-[#00ff66]">
@@ -51,6 +53,7 @@ export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls }: 
                             const catConfig = getCategoryConfig(category);
                             const marketSymbol = detectRelatedSymbol(item.title);
                             const isBm = bookmarkedUrls?.has(item.url);
+                            const isRead = readUrls?.has(item.url);
 
                             const isBreaking = importance === 'breaking';
                             const isHigh = importance === 'high';
@@ -59,6 +62,7 @@ export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls }: 
                                 <tr
                                     key={`${item.url}-${idx}`}
                                     className={`hover:bg-[#1e293b]/50 transition-colors group ${
+                                        isRead ? 'opacity-50 bg-black/40' :
                                         isBreaking ? 'bg-red-950/20' : isHigh ? 'bg-amber-950/10' : ''
                                     }`}
                                 >
@@ -101,11 +105,19 @@ export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls }: 
                                                     HIGH
                                                 </span>
                                             )}
+                                            {isRead && (
+                                                <span className="text-[9px] text-emerald-400 font-mono">
+                                                    [既読]
+                                                </span>
+                                            )}
                                             <a
                                                 href={item.url}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-gray-200 group-hover:text-[#00ff66] transition-colors font-sans text-xs line-clamp-1"
+                                                onClick={() => onMarkRead?.(item.url)}
+                                                className={`transition-colors font-sans text-xs line-clamp-1 ${
+                                                    isRead ? 'text-gray-500 group-hover:text-[#00ff66]' : 'text-gray-200 group-hover:text-[#00ff66]'
+                                                }`}
                                             >
                                                 {item.title}
                                             </a>
@@ -136,6 +148,7 @@ export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls }: 
                                             href={item.url}
                                             target="_blank"
                                             rel="noopener noreferrer"
+                                            onClick={() => onMarkRead?.(item.url)}
                                             className="text-gray-500 hover:text-[#00ff66] transition-colors text-xs ml-1"
                                         >
                                             ↗
