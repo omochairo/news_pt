@@ -5,6 +5,7 @@ import { NewsItem, NewsSource } from '@/lib/parser';
 import { scoreImportance, IMPORTANCE_CONFIGS } from '@/lib/importance';
 import { categorizeArticle, getCategoryConfig } from '@/lib/categorizer';
 import { detectRelatedSymbol } from '@/lib/market-data';
+import { checkPaywall } from '@/lib/paywall';
 import Sparkline from './Sparkline';
 
 const SOURCE_COLORS: Record<NewsSource, string> = {
@@ -115,6 +116,15 @@ export default function CompactNewsList({
                                                 {impConfig.label}
                                             </span>
                                         )}
+                                        {(() => {
+                                            const pw = checkPaywall(item);
+                                            if (!pw.isPaywall) return null;
+                                            return (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                                    {pw.label}
+                                                </span>
+                                            );
+                                        })()}
                                         {isRead && (
                                             <span className="text-[9px] font-mono text-emerald-400/80 bg-emerald-950/40 px-1 rounded border border-emerald-800/30">
                                                 ✓ 既読

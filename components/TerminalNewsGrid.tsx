@@ -5,6 +5,7 @@ import { NewsItem } from '@/lib/parser';
 import { scoreImportance } from '@/lib/importance';
 import { categorizeArticle, getCategoryConfig } from '@/lib/categorizer';
 import { detectRelatedSymbol } from '@/lib/market-data';
+import { checkPaywall } from '@/lib/paywall';
 import Sparkline from './Sparkline';
 
 interface TerminalNewsGridProps {
@@ -105,6 +106,15 @@ export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls, re
                                                     HIGH
                                                 </span>
                                             )}
+                                            {(() => {
+                                                const pw = checkPaywall(item);
+                                                if (!pw.isPaywall) return null;
+                                                return (
+                                                    <span className="px-1.5 py-0.2 bg-amber-900/80 text-amber-300 border border-amber-600/50 font-bold text-[9px] rounded">
+                                                        🔒 有料
+                                                    </span>
+                                                );
+                                            })()}
                                             {isRead && (
                                                 <span className="text-[9px] text-emerald-400 font-mono">
                                                     [既読]
