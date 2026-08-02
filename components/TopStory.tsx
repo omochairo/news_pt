@@ -20,9 +20,11 @@ interface TopStoryProps {
     item: NewsItem;
     onBookmark?: (item: NewsItem) => void;
     isBookmarked?: boolean;
+    isRead?: boolean;
+    onMarkRead?: (url: string) => void;
 }
 
-export default function TopStory({ item, onBookmark, isBookmarked }: TopStoryProps) {
+export default function TopStory({ item, onBookmark, isBookmarked, isRead, onMarkRead }: TopStoryProps) {
     const accentColor = SOURCE_COLORS[item.source];
     const importance = scoreImportance(item.title);
     const importanceConfig = IMPORTANCE_CONFIGS[importance];
@@ -34,7 +36,8 @@ export default function TopStory({ item, onBookmark, isBookmarked }: TopStoryPro
             href={item.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="top-story glass-panel group relative block"
+            onClick={() => onMarkRead?.(item.url)}
+            className={`top-story glass-panel group relative block transition-opacity ${isRead ? 'opacity-70 bg-black/20' : ''}`}
         >
             {/* Accent border top */}
             <div
@@ -81,6 +84,12 @@ export default function TopStory({ item, onBookmark, isBookmarked }: TopStoryPro
                         </span>
                     )}
 
+                    {isRead && (
+                        <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-800/40">
+                            ✓ 既読
+                        </span>
+                    )}
+
                     {/* Sparkline */}
                     {(() => {
                         const symbolData = detectRelatedSymbol(item.title);
@@ -95,7 +104,7 @@ export default function TopStory({ item, onBookmark, isBookmarked }: TopStoryPro
                 </div>
 
                 {/* Title */}
-                <h2 className="text-2xl md:text-3xl font-bold leading-snug mb-4 group-hover:text-white transition-colors">
+                <h2 className={`text-2xl md:text-3xl font-bold leading-snug mb-4 transition-colors ${isRead ? 'text-gray-300 group-hover:text-white' : 'text-gray-100 group-hover:text-white'}`}>
                     {item.title}
                 </h2>
 
