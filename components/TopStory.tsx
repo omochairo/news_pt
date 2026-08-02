@@ -5,6 +5,7 @@ import { NewsItem, NewsSource } from '@/lib/parser';
 import { scoreImportance, IMPORTANCE_CONFIGS } from '@/lib/importance';
 import { categorizeArticle, getCategoryConfig } from '@/lib/categorizer';
 import { detectRelatedSymbol } from '@/lib/market-data';
+import { checkPaywall } from '@/lib/paywall';
 import Sparkline from './Sparkline';
 
 const SOURCE_COLORS: Record<NewsSource, string> = {
@@ -83,6 +84,17 @@ export default function TopStory({ item, onBookmark, isBookmarked, isRead, onMar
                             ● {importanceConfig.label}
                         </span>
                     )}
+
+                    {/* Paywall badge */}
+                    {(() => {
+                        const pw = checkPaywall(item);
+                        if (!pw.isPaywall) return null;
+                        return (
+                            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                {pw.label}
+                            </span>
+                        );
+                    })()}
 
                     {isRead && (
                         <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-800/40">
