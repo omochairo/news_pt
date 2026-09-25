@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { getUpcomingEvents, getEventTimeLeft } from '@/lib/economic-calendar';
+import { EconomicEvent, ECONOMIC_EVENTS, getUpcomingEvents, getEventTimeLeft } from '@/lib/economic-calendar';
 
 interface EconomicCalendarProps {
     onClose: () => void;
@@ -14,7 +14,22 @@ export default function EconomicCalendar({ onClose }: EconomicCalendarProps) {
         const timer = setInterval(() => setNow(new Date()), 60 * 1000);
         return () => clearInterval(timer);
     }, []);
-    const events = getUpcomingEvents(now);
+
+    // 中央銀行の日程は /api/calendar が公式ページから自動取得する。取れるまでは手動の予定表を出す
+    const [allEvents, setAllEvents] = useState<EconomicEvent[]>(ECONOMIC_EVENTS);
+    useEffect(() => {
+        let cancelled = false;
+        fetch('/api/calendar')
+            .then(res => (res.ok ? res.json() : null))
+            .then(json => {
+                if (!cancelled && Array.isArray(json?.events) && json.events.length > 0) setAllEvents(json.events);
+            })
+            .catch(e => console.error('Calendar fetch error:', e));
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+    const events = getUpcomingEvents(allEvents, now);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
