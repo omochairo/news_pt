@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { NewsItem, NewsSource } from '@/lib/parser';
 import { NewsCategory, categorizeArticle } from '@/lib/categorizer';
 import { addBookmark, removeBookmark, getBookmarks, isBookmarked as checkBookmarked, BookmarkedItem } from '@/lib/bookmarks';
@@ -32,6 +32,10 @@ interface NewsData {
 
 type ViewMode = 'modern' | 'terminal' | 'split';
 const VIEWMODE_STORAGE_KEY = 'vantage-point-viewmode';
+const UNREAD_ONLY_STORAGE_KEY = 'vantage-point-unread-only';
+const NEWS_REFRESH_MS = 5 * 60 * 1000;
+// タブ・アプリに戻ってきたとき、これより古ければ取り直す
+const STALE_ON_RETURN_MS = 60 * 1000;
 
 export default function Home() {
     const [data, setData] = useState<NewsData | null>(null);
@@ -47,6 +51,9 @@ export default function Home() {
     const [historyData, setHistoryData] = useState<DailyHistory[]>([]);
     const [activeSources, setActiveSources] = useState<Set<NewsSource>>(new Set(ALL_SOURCES));
     const [viewMode, setViewMode] = useState<ViewMode>('modern');
+    const [unreadOnly, setUnreadOnly] = useState(false);
+    const [showScrollTop, setShowScrollTop] = useState(false);
+    const lastFetchRef = useRef(0);
 
     useEffect(() => {
         setBookmarks(getBookmarks());
@@ -58,6 +65,29 @@ export default function Home() {
         if (savedViewMode === 'terminal' || savedViewMode === 'modern' || savedViewMode === 'split') {
             setViewMode(savedViewMode);
         }
+        try {
+            setUnreadOnly(localStorage.getItem(UNREAD_ONLY_STORAGE_KEY) === '1');
+        } catch {
+            // localStorage が使えない環境では既定値のまま
+        }
+    }, []);
+
+    const toggleUnreadOnly = () => {
+        setUnreadOnly(prev => {
+            try {
+                localStorage.setItem(UNREAD_ONLY_STORAGE_KEY, prev ? '0' : '1');
+            } catch {
+                // 保存できなくても表示の切り替えは効かせる
+            }
+            return !prev;
+        });
+    };
+
+    // 下にスクロールしたら「先頭へ戻る」ボタンを出す
+    useEffect(() => {
+        const onScroll = () => setShowScrollTop(window.scrollY > 800);
+        window.addEventListener('scroll', onScroll, { passive: true });
+        return () => window.removeEventListener('scroll', onScroll);
     }, []);
 
     const changeViewMode = (mode: ViewMode) => {
@@ -72,6 +102,7 @@ export default function Home() {
     };
 
     const fetchNews = async () => {
+        lastFetchRef.current = Date.now();
         setLoading(true);
         try {
             const res = await fetch('/api/news');
@@ -100,8 +131,21 @@ export default function Home() {
 
     useEffect(() => {
         fetchNews();
-        const interval = setInterval(fetchNews, 5 * 60 * 1000); // 5分ごとに更新
-        return () => clearInterval(interval);
+        // 5分ごとに更新。裏に回っている間は取りに行かず、戻ってきたときに古ければ取り直す
+        // （スマホでアプリに戻ったとき、次の定期更新まで古い記事が出続けていた）
+        const interval = setInterval(() => {
+            if (document.visibilityState === 'visible') fetchNews();
+        }, NEWS_REFRESH_MS);
+        const onVisible = () => {
+            if (document.visibilityState === 'visible' && Date.now() - lastFetchRef.current > STALE_ON_RETURN_MS) {
+                fetchNews();
+            }
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
     }, []);
 
     // ソーストグル
@@ -127,8 +171,11 @@ export default function Home() {
         if (activeCategory !== 'all') {
             filtered = filtered.filter(item => categorizeArticle(item.title) === activeCategory);
         }
+        if (unreadOnly) {
+            filtered = filtered.filter(item => !readUrls.has(item.url));
+        }
         return filtered;
-    }, [searchQuery, activeCategory]);
+    }, [searchQuery, activeCategory, unreadOnly, readUrls]);
 
     // 全ソースを統合して時間順にソート（タイムライン）
     const timelineItems = useMemo(() => {
@@ -220,10 +267,10 @@ export default function Home() {
             <MarketTicker />
 
             <main className="container min-h-screen py-6">
-                <header className="mb-6 space-y-5">
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <header className="mb-5 md:mb-6 space-y-3 md:space-y-5">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 md:gap-4">
                         <div>
-                            <h1 className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-white via-gray-200 to-gray-500 bg-clip-text text-transparent mb-1">
+                            <h1 className="text-2xl md:text-5xl font-bold bg-gradient-to-r from-white via-gray-200 to-gray-500 bg-clip-text text-transparent mb-1">
                                 Vantage Point
                             </h1>
                             <p className="text-[var(--text-secondary)] text-xs md:text-sm font-mono uppercase tracking-widest hidden md:block">
@@ -240,8 +287,9 @@ export default function Home() {
                                         viewMode === 'modern' ? 'bg-blue-600 text-white font-bold shadow' : 'text-gray-400 hover:text-gray-200'
                                     }`}
                                     title="モダンカード表示"
+                                    aria-label="モダンカード表示"
                                 >
-                                    📱 MODERN
+                                    📱<span className="hidden sm:inline"> MODERN</span>
                                 </button>
                                 <button
                                     onClick={() => changeViewMode('terminal')}
@@ -249,8 +297,9 @@ export default function Home() {
                                         viewMode === 'terminal' ? 'bg-[#00ff66]/20 text-[#00ff66] font-bold shadow border border-[#00ff66]/40' : 'text-gray-400 hover:text-gray-200'
                                     }`}
                                     title="プロ仕様高密度ターミナル表示"
+                                    aria-label="ターミナル表示"
                                 >
-                                    ⚡ TERMINAL
+                                    ⚡<span className="hidden sm:inline"> TERMINAL</span>
                                 </button>
                                 <button
                                     onClick={() => changeViewMode('split')}
@@ -258,8 +307,9 @@ export default function Home() {
                                         viewMode === 'split' ? 'bg-amber-500/20 text-amber-300 font-bold shadow border border-amber-500/40' : 'text-gray-400 hover:text-gray-200'
                                     }`}
                                     title="画面分割マルチビュー"
+                                    aria-label="画面分割表示"
                                 >
-                                    📑 DUAL VIEW
+                                    📑<span className="hidden sm:inline"> DUAL VIEW</span>
                                 </button>
                             </div>
 
@@ -270,7 +320,7 @@ export default function Home() {
                                 title="経済指標・重要イベントカレンダー"
                             >
                                 <span>📅</span>
-                                <span>経済カレンダー</span>
+                                <span className="hidden sm:inline">経済カレンダー</span>
                             </button>
 
                             {/* PWA Install Prompt */}
@@ -280,14 +330,16 @@ export default function Home() {
                                 onClick={() => setShowHistory(true)}
                                 className="header-action-btn"
                                 title="過去の記事アーカイブ"
+                                aria-label="過去の記事アーカイブ"
                             >
-                                <span>🗓️</span>
+                                <span>🕘</span>
                             </button>
 
                             <button
                                 onClick={() => setShowBookmarks(true)}
                                 className="header-action-btn"
                                 title="ブックマーク"
+                                aria-label="ブックマーク"
                             >
                                 <span>★</span>
                                 {bookmarks.length > 0 && (
@@ -304,7 +356,8 @@ export default function Home() {
                                 onClick={fetchNews}
                                 disabled={loading}
                                 className="header-action-btn"
-                                title="Refresh News"
+                                title={lastUpdated ? `ニュースを更新（最終更新 ${lastUpdated}）` : 'ニュースを更新'}
+                                aria-label="ニュースを更新"
                             >
                                 <svg
                                     className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`}
@@ -327,6 +380,7 @@ export default function Home() {
 
                             {/* Search & Trend Cloud */}
                             <div className="space-y-2">
+                                <div className="flex items-center gap-2">
                                 <div className="relative w-full max-w-xl">
                                     <input
                                         type="text"
@@ -341,11 +395,24 @@ export default function Home() {
                                         </svg>
                                     </div>
                                 </div>
+                                <button
+                                    onClick={toggleUnreadOnly}
+                                    aria-pressed={unreadOnly}
+                                    className={`flex-shrink-0 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors whitespace-nowrap ${
+                                        unreadOnly
+                                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                                            : 'bg-[var(--card-bg)] text-gray-400 border-[var(--card-border)] hover:text-gray-200'
+                                    }`}
+                                    title="既読の記事を隠す"
+                                >
+                                    {unreadOnly ? '✓ 未読のみ' : '未読のみ'}
+                                </button>
+                                </div>
 
                                 {/* Trend Keywords Cloud */}
                                 {trendKeywords.length > 0 && (
-                                    <div className="flex items-center gap-1.5 flex-wrap text-xs pt-1">
-                                        <span className="text-xs font-mono font-bold text-amber-400 flex items-center gap-1 mr-1">
+                                    <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible text-xs pt-1">
+                                        <span className="text-xs font-mono font-bold text-amber-400 flex items-center gap-1 mr-1 flex-shrink-0">
                                             🔥 TRENDS:
                                         </span>
                                         {trendKeywords.map((kw) => {
@@ -354,7 +421,7 @@ export default function Home() {
                                                 <button
                                                     key={kw.word}
                                                     onClick={() => handleKeywordClick(kw.word)}
-                                                    className={`px-2.5 py-0.5 rounded-full text-xs transition-all font-mono ${
+                                                    className={`px-2.5 py-0.5 rounded-full text-xs transition-all font-mono whitespace-nowrap flex-shrink-0 ${
                                                         isSelected
                                                             ? 'bg-amber-500 text-black font-bold shadow-[0_0_8px_rgba(245,158,11,0.5)]'
                                                             : 'bg-[var(--card-bg)] text-gray-300 border border-[var(--card-border)] hover:border-amber-500/50 hover:text-amber-300'
@@ -430,6 +497,19 @@ export default function Home() {
                     </div>
                 )}
             </main>
+
+            {/* 先頭へ戻る */}
+            {showScrollTop && (
+                <button
+                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    className="fixed bottom-5 right-5 z-40 w-11 h-11 rounded-full bg-[var(--card-bg)] border border-[var(--card-border)] text-gray-200 shadow-lg hover:bg-white/10 transition-colors"
+                    style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
+                    title="ページの先頭へ"
+                    aria-label="ページの先頭へ"
+                >
+                    ↑
+                </button>
+            )}
 
             {/* Bookmarks Modal */}
             {showBookmarks && (

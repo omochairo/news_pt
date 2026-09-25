@@ -89,7 +89,7 @@ export default function CompactNewsList({
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={() => onMarkRead?.(item.url)}
-                                    className="block px-5 py-3 hover:bg-white/[0.02] transition-colors"
+                                    className={`block pl-4 md:pl-5 py-3 hover:bg-white/[0.02] transition-colors ${onBookmark ? 'pr-10' : 'pr-4 md:pr-5'}`}
                                 >
                                     {/* Top line: source + category + importance + time */}
                                     <div className="flex items-center gap-2 mb-1.5">
@@ -105,9 +105,11 @@ export default function CompactNewsList({
                                                 {item.source}
                                             </span>
                                         )}
-                                        <span className="text-[9px] font-mono text-[var(--text-secondary)] uppercase tracking-widest">
-                                            {catConfig.icon} {catConfig.labelEn}
-                                        </span>
+                                        {category !== 'all' && (
+                                            <span className="text-[9px] font-mono text-[var(--text-secondary)] uppercase tracking-widest">
+                                                {catConfig.icon} {catConfig.labelEn}
+                                            </span>
+                                        )}
                                         {importance !== 'normal' && (
                                             <span
                                                 className="text-[9px] font-bold px-1.5 py-0 rounded-full uppercase"

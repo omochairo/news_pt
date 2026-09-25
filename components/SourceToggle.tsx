@@ -22,7 +22,7 @@ interface SourceToggleProps {
 export default function SourceToggle({ activeSources, onToggle }: SourceToggleProps) {
     return (
         <div className="source-toggle-wrapper">
-            <div className="source-toggle flex-wrap">
+            <div className="source-toggle flex-nowrap md:flex-wrap">
                 {ALL_SOURCES.map((source) => {
                     const config = SOURCE_CONFIGS[source];
                     const isActive = activeSources.has(source);
@@ -34,7 +34,7 @@ export default function SourceToggle({ activeSources, onToggle }: SourceTogglePr
                             className={`source-toggle-btn ${isActive ? 'source-toggle-active' : ''}`}
                             style={isActive ? {
                                 borderColor: config.color,
-                                boxShadow: `0 0 10px ${config.color}33`,
+                                boxShadow: `0 0 10px color-mix(in srgb, ${config.color} 20%, transparent)`,
                             } : {}}
                         >
                             <span

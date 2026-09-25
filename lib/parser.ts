@@ -134,11 +134,18 @@ async function fetchFromGoogleNewsRss(query: string, source: NewsSource, cleanSu
             timeout: 10000,
         });
 
+        // Google News の見出しは末尾が必ず「 - 媒体名」。媒体名の表記揺れ（ロイター / Reuters 等）があるので
+        // 指定の媒体名で落とせなかったときは最後の区切り以降を落とす
         return parseRssXml(response.data, source, (title) => {
+            let cleaned = title;
             if (cleanSuffix) {
-                return title.replace(new RegExp(`\\s*[-–—]\\s*${cleanSuffix}.*$`, 'i'), '').trim();
+                cleaned = title.replace(new RegExp(`\\s*[-–—]\\s*${cleanSuffix}.*$`, 'i'), '');
             }
-            return title.replace(/\s*[-–—]\s*[^-–—]+$/, '').trim();
+            if (cleaned === title) {
+                cleaned = title.replace(/\s+[-–—]\s+[^-–—]+$/, '');
+            }
+            // 媒体側のタイトルに付いている「 | ロイター」等も落とす
+            return cleaned.replace(/\s*[|｜]\s*(ロイター|Reuters|ブルームバーグ|Bloomberg|CNN\.co\.jp|日本経済新聞)\s*$/i, '').trim();
         });
     } catch (error: any) {
         console.error(`Google News RSS fetch failed for ${source} (${query}):`, error.message);
