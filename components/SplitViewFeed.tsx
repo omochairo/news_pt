@@ -122,7 +122,7 @@ export default function SplitViewFeed({
         };
         raw.forEach(i => {
             const cat = categorizeArticle(i.title);
-            counts[cat]++;
+            if (cat !== 'all') counts[cat]++;
         });
         return counts;
     };

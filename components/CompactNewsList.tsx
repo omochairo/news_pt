@@ -81,7 +81,7 @@ export default function CompactNewsList({
                                 className={`compact-news-item group transition-opacity ${isRead ? 'opacity-60 bg-black/20' : ''}`}
                                 style={importance !== 'normal'
                                     ? { borderLeft: `2px solid ${impConfig.color}` }
-                                    : { borderLeft: `2px solid ${itemColor}22` }
+                                    : { borderLeft: `2px solid color-mix(in srgb, ${itemColor} 13%, transparent)` }
                                 }
                             >
                                 <a
@@ -99,7 +99,7 @@ export default function CompactNewsList({
                                                 className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
                                                 style={{
                                                     backgroundColor: itemColor,
-                                                    boxShadow: `0 0 6px ${itemColor}44`,
+                                                    boxShadow: `0 0 6px color-mix(in srgb, ${itemColor} 27%, transparent)`,
                                                 }}
                                             >
                                                 {item.source}
@@ -146,7 +146,7 @@ export default function CompactNewsList({
                                         if (!symbolData) return null;
                                         return (
                                             <div className="mt-2">
-                                                <Sparkline data={symbolData} compact />
+                                                <Sparkline symbol={symbolData} compact />
                                             </div>
                                         );
                                     })()}

@@ -1,6 +1,12 @@
 import { NewsItem } from './parser';
 
 const HISTORY_KEY = 'vantage-point-history';
+const MAX_ITEMS_PER_DAY = 300;
+
+function toEpoch(item: NewsItem): number {
+    const t = item.isoDate ? new Date(item.isoDate).getTime() : NaN;
+    return Number.isNaN(t) ? 0 : t;
+}
 
 export interface DailyHistory {
     date: string; // YYYY-MM-DD format
@@ -42,12 +48,13 @@ export function saveToDailyHistory(news: NewsItem[]) {
         });
 
         if (addedCount > 0) {
-            // 時間順（新しい順）にソート
-            todayRecord.items.sort((a, b) => {
-                const timeA = a.time || '00:00';
-                const timeB = b.time || '00:00';
-                return timeB.localeCompare(timeA);
-            });
+            // 時間順（新しい順）にソート。表示用の time は "14:00" と "7/22 14:00" が混ざり
+            // 文字列比較では前日の記事が上に来るので、isoDate で比べる
+            todayRecord.items.sort((a, b) => toEpoch(b) - toEpoch(a));
+            // 1日あたりの件数に上限を設けて localStorage の容量超過を防ぐ
+            if (todayRecord.items.length > MAX_ITEMS_PER_DAY) {
+                todayRecord.items = todayRecord.items.slice(0, MAX_ITEMS_PER_DAY);
+            }
             
             // 最大過去30日分だけ保持してストレージ容量を節約
             if (history.length > 30) {

@@ -1,13 +1,36 @@
 'use client';
 
-import React from 'react';
-import { ECONOMIC_EVENTS, getEventTimeLeft } from '@/lib/economic-calendar';
+import React, { useEffect, useState } from 'react';
+import { EconomicEvent, ECONOMIC_EVENTS, getUpcomingEvents, getEventTimeLeft } from '@/lib/economic-calendar';
 
 interface EconomicCalendarProps {
     onClose: () => void;
 }
 
 export default function EconomicCalendar({ onClose }: EconomicCalendarProps) {
+    // 開いたままでもカウントダウンが進むよう、1分ごとに再計算する
+    const [now, setNow] = useState(() => new Date());
+    useEffect(() => {
+        const timer = setInterval(() => setNow(new Date()), 60 * 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    // 中央銀行の日程は /api/calendar が公式ページから自動取得する。取れるまでは手動の予定表を出す
+    const [allEvents, setAllEvents] = useState<EconomicEvent[]>(ECONOMIC_EVENTS);
+    useEffect(() => {
+        let cancelled = false;
+        fetch('/api/calendar')
+            .then(res => (res.ok ? res.json() : null))
+            .then(json => {
+                if (!cancelled && Array.isArray(json?.events) && json.events.length > 0) setAllEvents(json.events);
+            })
+            .catch(e => console.error('Calendar fetch error:', e));
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+    const events = getUpcomingEvents(allEvents, now);
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
             <div className="glass-panel w-full max-w-4xl max-h-[85vh] flex flex-col border border-[var(--card-border)] rounded-2xl shadow-2xl overflow-hidden">
@@ -49,8 +72,15 @@ export default function EconomicCalendar({ onClose }: EconomicCalendarProps) {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--card-border)]/50">
-                                {ECONOMIC_EVENTS.map((item) => {
-                                    const timeLeft = getEventTimeLeft(item.date, item.time);
+                                {events.length === 0 && (
+                                    <tr>
+                                        <td colSpan={8} className="py-6 text-center text-[var(--text-secondary)]">
+                                            予定されているイベントがありません（予定表の更新が必要です）
+                                        </td>
+                                    </tr>
+                                )}
+                                {events.map((item) => {
+                                    const timeLeft = getEventTimeLeft(item.date, item.time, now);
                                     const isHigh = item.importance === 'high';
                                     const isToday = timeLeft.includes('時間') || timeLeft.includes('分') || timeLeft.includes('対応中');
 

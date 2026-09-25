@@ -60,7 +60,7 @@ export default function TopStory({ item, onBookmark, isBookmarked, isRead, onMar
                         className="text-[10px] font-bold px-2.5 py-1 rounded-full text-white uppercase tracking-wider"
                         style={{
                             backgroundColor: accentColor,
-                            boxShadow: `0 0 12px ${accentColor}44`
+                            boxShadow: `0 0 12px color-mix(in srgb, ${accentColor} 27%, transparent)`
                         }}
                     >
                         {item.source}
@@ -106,7 +106,7 @@ export default function TopStory({ item, onBookmark, isBookmarked, isRead, onMar
                     {(() => {
                         const symbolData = detectRelatedSymbol(item.title);
                         if (!symbolData) return null;
-                        return <Sparkline data={symbolData} />;
+                        return <Sparkline symbol={symbolData} />;
                     })()}
 
                     {/* Time */}

@@ -103,7 +103,9 @@ export const CATEGORIES: CategoryConfig[] = [
  */
 export function categorizeArticle(title: string): NewsCategory {
     const lowerTitle = title.toLowerCase();
-    let bestCategory: NewsCategory = 'economy'; // デフォルト
+    // どのカテゴリのキーワードにも当たらなければ 'all'（未分類）。
+    // 以前は 'economy' を既定にしていたため、無関係な記事が「経済指標」タブに流れ込んでいた。
+    let bestCategory: NewsCategory = 'all';
     let bestScore = 0;
 
     for (const cat of CATEGORIES) {

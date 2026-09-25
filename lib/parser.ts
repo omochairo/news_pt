@@ -54,12 +54,13 @@ function parseDateInfo(pubDateStr?: string): { time: string; isoDate: string } {
     }
 
     const isoDate = dateObj.toISOString();
-    
-    // 今日と同じ日付なら HH:MM、違えば MM/DD HH:MM
-    const isToday =
-        dateObj.getFullYear() === now.getFullYear() &&
-        dateObj.getMonth() === now.getMonth() &&
-        dateObj.getDate() === now.getDate();
+
+    // 今日と同じ日付なら HH:MM、違えば MM/DD HH:MM。
+    // サーバー (Netlify) は UTC で動くので、日付の判定も JST で行う（JST 0〜9時の記事が前日扱いになっていた）
+    const jstDate = (d: Date) => d.toLocaleDateString('ja-JP', {
+        timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', year: 'numeric',
+    });
+    const isToday = jstDate(dateObj) === jstDate(now);
 
     const timeStr = dateObj.toLocaleTimeString('ja-JP', {
         hour: '2-digit',
@@ -70,7 +71,9 @@ function parseDateInfo(pubDateStr?: string): { time: string; isoDate: string } {
     if (isToday) {
         return { time: timeStr, isoDate };
     } else {
-        const monthDay = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+        const monthDay = dateObj.toLocaleDateString('ja-JP', {
+            timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric',
+        });
         return { time: `${monthDay} ${timeStr}`, isoDate };
     }
 }

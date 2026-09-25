@@ -7,6 +7,7 @@ import { addBookmark, removeBookmark, getBookmarks, isBookmarked as checkBookmar
 import { extractTrendKeywords, TrendKeyword } from '@/lib/keywords';
 import { getReadUrls, markAsRead } from '@/lib/read-status';
 import MarketTicker from '@/components/MarketTicker';
+import { MarketDataProvider } from '@/lib/market-context';
 import CategoryTabs from '@/components/CategoryTabs';
 import TopStory from '@/components/TopStory';
 import CompactNewsList from '@/components/CompactNewsList';
@@ -187,7 +188,7 @@ export default function Home() {
         };
         allRaw.forEach(item => {
             const cat = categorizeArticle(item.title);
-            counts[cat]++;
+            if (cat !== 'all') counts[cat]++;
         });
         return counts;
     }, [data, activeSources]);
@@ -215,7 +216,7 @@ export default function Home() {
     };
 
     return (
-        <>
+        <MarketDataProvider>
             <MarketTicker />
 
             <main className="container min-h-screen py-6">
@@ -453,6 +454,6 @@ export default function Home() {
                     onClose={() => setShowCalendar(false)}
                 />
             )}
-        </>
+        </MarketDataProvider>
     );
 }

@@ -1,36 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-
-interface MarketItem {
-    symbol: string;
-    name: string;
-    price: string;
-    change: string;
-    changePercent: string;
-    direction: 'up' | 'down' | 'flat';
-}
+import React, { useState } from 'react';
+import { useMarketData } from '@/lib/market-context';
 
 export default function MarketTicker() {
-    const [data, setData] = useState<MarketItem[]>([]);
+    const data = useMarketData();
     const [paused, setPaused] = useState(false);
-
-    useEffect(() => {
-        async function fetchData() {
-            try {
-                const res = await fetch('/api/market');
-                if (!res.ok) throw new Error('Market API failed');
-                const json = await res.json();
-                setData(json.data || []);
-            } catch (e) {
-                console.error('Market ticker error:', e);
-            }
-        }
-
-        fetchData();
-        const interval = setInterval(fetchData, 60 * 1000); // 1分ごとに更新
-        return () => clearInterval(interval);
-    }, []);
 
     if (data.length === 0) return null;
 
