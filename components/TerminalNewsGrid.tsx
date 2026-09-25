@@ -137,7 +137,7 @@ export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls, re
                                     {/* MARKET IMPACT (Sparkline) */}
                                     <td className="py-2 px-3 whitespace-nowrap">
                                         {marketSymbol ? (
-                                            <Sparkline data={marketSymbol} compact />
+                                            <Sparkline symbol={marketSymbol} compact />
                                         ) : (
                                             <span className="text-gray-600 text-[10px]">—</span>
                                         )}
