@@ -29,14 +29,15 @@ export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls, re
                 </div>
             </div>
 
+            <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="border-b border-[#1e293b] text-gray-400 bg-[#0f172a]/50 text-[11px] uppercase tracking-wider">
                         <th className="py-2.5 px-3 w-16">TIME</th>
                         <th className="py-2.5 px-3 w-24">SOURCE</th>
-                        <th className="py-2.5 px-3 w-24">CAT</th>
+                        <th className="py-2.5 px-3 w-24 hidden md:table-cell">CAT</th>
                         <th className="py-2.5 px-3">HEADLINE</th>
-                        <th className="py-2.5 px-3 w-48">MARKET IMPACT</th>
+                        <th className="py-2.5 px-3 w-48 hidden md:table-cell">MARKET IMPACT</th>
                         <th className="py-2.5 px-3 w-20 text-center">ACTION</th>
                     </tr>
                 </thead>
@@ -89,8 +90,8 @@ export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls, re
                                     </td>
 
                                     {/* CAT */}
-                                    <td className="py-2 px-3 text-gray-400 whitespace-nowrap text-[11px]">
-                                        {catConfig.icon} {catConfig.labelEn}
+                                    <td className="py-2 px-3 text-gray-400 whitespace-nowrap text-[11px] hidden md:table-cell">
+                                        {category === 'all' ? '—' : `${catConfig.icon} ${catConfig.labelEn}`}
                                     </td>
 
                                     {/* HEADLINE */}
@@ -125,7 +126,7 @@ export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls, re
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 onClick={() => onMarkRead?.(item.url)}
-                                                className={`transition-colors font-sans text-xs line-clamp-1 ${
+                                                className={`transition-colors font-sans text-xs line-clamp-2 md:line-clamp-1 ${
                                                     isRead ? 'text-gray-500 group-hover:text-[#00ff66]' : 'text-gray-200 group-hover:text-[#00ff66]'
                                                 }`}
                                             >
@@ -135,7 +136,7 @@ export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls, re
                                     </td>
 
                                     {/* MARKET IMPACT (Sparkline) */}
-                                    <td className="py-2 px-3 whitespace-nowrap">
+                                    <td className="py-2 px-3 whitespace-nowrap hidden md:table-cell">
                                         {marketSymbol ? (
                                             <Sparkline symbol={marketSymbol} compact />
                                         ) : (
@@ -170,6 +171,7 @@ export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls, re
                     )}
                 </tbody>
             </table>
+            </div>
         </div>
     );
 }

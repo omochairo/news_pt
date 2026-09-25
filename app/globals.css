@@ -284,6 +284,15 @@ a {
     /* default */
 }
 
+/* 横スクロール領域のスクロールバーを隠す */
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
 /* ===========================
    Header Action Buttons
    =========================== */

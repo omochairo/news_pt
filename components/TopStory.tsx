@@ -33,11 +33,7 @@ export default function TopStory({ item, onBookmark, isBookmarked, isRead, onMar
     const categoryConfig = getCategoryConfig(category);
 
     return (
-        <a
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => onMarkRead?.(item.url)}
+        <article
             className={`top-story glass-panel group relative block transition-opacity ${isRead ? 'opacity-70 bg-black/20' : ''}`}
         >
             {/* Accent border top */}
@@ -52,7 +48,7 @@ export default function TopStory({ item, onBookmark, isBookmarked, isRead, onMar
                 style={{ background: `radial-gradient(ellipse at top left, ${accentColor}, transparent 70%)` }}
             />
 
-            <div className="relative z-10 p-8">
+            <div className="relative z-10 p-5 md:p-8">
                 {/* Top bar: badges */}
                 <div className="flex items-center gap-3 mb-5 flex-wrap">
                     {/* Source badge */}
@@ -66,10 +62,12 @@ export default function TopStory({ item, onBookmark, isBookmarked, isRead, onMar
                         {item.source}
                     </span>
 
-                    {/* Category badge */}
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-[var(--card-border)] text-[var(--text-secondary)] uppercase tracking-widest">
-                        {categoryConfig.icon} {categoryConfig.labelEn}
-                    </span>
+                    {/* Category badge（未分類なら出さない） */}
+                    {category !== 'all' && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-[var(--card-border)] text-[var(--text-secondary)] uppercase tracking-widest">
+                            {categoryConfig.icon} {categoryConfig.labelEn}
+                        </span>
+                    )}
 
                     {/* Importance badge */}
                     {importance !== 'normal' && (
@@ -116,8 +114,16 @@ export default function TopStory({ item, onBookmark, isBookmarked, isRead, onMar
                 </div>
 
                 {/* Title */}
-                <h2 className={`text-2xl md:text-3xl font-bold leading-snug mb-4 transition-colors ${isRead ? 'text-gray-300 group-hover:text-white' : 'text-gray-100 group-hover:text-white'}`}>
-                    {item.title}
+                <h2 className={`text-xl md:text-3xl font-bold leading-snug mb-4 transition-colors ${isRead ? 'text-gray-300 group-hover:text-white' : 'text-gray-100 group-hover:text-white'}`}>
+                    <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => onMarkRead?.(item.url)}
+                        className="after:absolute after:inset-0 after:content-['']"
+                    >
+                        {item.title}
+                    </a>
                 </h2>
 
                 {/* Footer */}
@@ -133,14 +139,15 @@ export default function TopStory({ item, onBookmark, isBookmarked, isRead, onMar
                                     e.stopPropagation();
                                     onBookmark(item);
                                 }}
-                                className="bookmark-btn"
+                                className="bookmark-btn relative z-20"
                                 title={isBookmarked ? 'ブックマーク解除' : 'ブックマーク'}
+                                aria-label={isBookmarked ? 'ブックマーク解除' : 'ブックマーク'}
                             >
                                 {isBookmarked ? '★' : '☆'}
                             </button>
                         )}
                         <span className="text-white opacity-40 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs font-mono uppercase tracking-widest">
-                            READ FULL STORY
+                            <span className="hidden sm:inline">READ FULL STORY</span>
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                             </svg>
@@ -148,6 +155,6 @@ export default function TopStory({ item, onBookmark, isBookmarked, isRead, onMar
                     </div>
                 </div>
             </div>
-        </a>
+        </article>
     );
 }
