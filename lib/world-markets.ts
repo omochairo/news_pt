@@ -94,6 +94,23 @@ export interface WorldQuote {
     changePercent: number;
     history: number[];      // 当日の終値（古い順・間引き済み）
     lastTradeAt?: string;   // 最後の足の時刻（ISO）
+    sessionStart?: string;  // 直近の取引日の取引時間（ISO）。先物・為替・暗号資産はほぼ 24 時間
+    sessionEnd?: string;
+}
+
+export type MarketStatus = 'open' | 'closed';
+
+// 取引時間内でも、最後の足からこれ以上たっていたら止まっているとみなす（昼休み・休場・取得の遅れ）。
+// Yahoo の値は 15 分前後遅れるので、それより長めにとる
+const STALE_AFTER_MS = 30 * 60 * 1000;
+
+/** 取引中か。直近の取引日の取引時間内で、かつ最近まで値が付いていれば取引中 */
+export function getMarketStatus(quote: Pick<WorldQuote, 'lastTradeAt' | 'sessionStart' | 'sessionEnd'>, now: Date): MarketStatus {
+    if (!quote.sessionStart || !quote.sessionEnd || !quote.lastTradeAt) return 'closed';
+    const t = now.getTime();
+    const inSession = t >= new Date(quote.sessionStart).getTime() && t <= new Date(quote.sessionEnd).getTime();
+    const fresh = t - new Date(quote.lastTradeAt).getTime() <= STALE_AFTER_MS;
+    return inSession && fresh ? 'open' : 'closed';
 }
 
 export const HISTORY_MAX_POINTS = 60;
@@ -111,7 +128,12 @@ interface SparkEntry {
     close?: unknown[];
     previousClose?: unknown;
     chartPreviousClose?: unknown;
+    fulldayPrice?: unknown;
+    start?: unknown;
+    end?: unknown;
 }
+
+const toIso = (sec: unknown) => (isNum(sec) ? new Date(sec * 1000).toISOString() : undefined);
 
 /** spark API の応答（{ [symbol]: {...} }）を WorldQuote に整形する。値が欠けた銘柄は含めない */
 export function parseSparkResponse(body: unknown): WorldQuote[] {
@@ -132,7 +154,9 @@ export function parseSparkResponse(body: unknown): WorldQuote[] {
         });
 
         const previousClose = isNum(raw.previousClose) ? raw.previousClose : isNum(raw.chartPreviousClose) ? raw.chartPreviousClose : undefined;
-        const price = points.at(-1);
+        // 取引日が切り替わって当日の足がまだ無い（取引開始前）ときは close が null になる。
+        // その間は直前の取引日の終値（fulldayPrice）で出し、チャートは空にする
+        const price = points.at(-1) ?? (isNum(raw.fulldayPrice) ? raw.fulldayPrice : undefined);
         if (price === undefined || previousClose === undefined || previousClose === 0) continue;
 
         const change = price - previousClose;
@@ -143,7 +167,9 @@ export function parseSparkResponse(body: unknown): WorldQuote[] {
             change,
             changePercent: (change / previousClose) * 100,
             history: downsample(points, HISTORY_MAX_POINTS),
-            lastTradeAt: lastStamp !== undefined ? new Date(lastStamp * 1000).toISOString() : undefined,
+            lastTradeAt: toIso(lastStamp),
+            sessionStart: toIso(raw.start),
+            sessionEnd: toIso(raw.end),
         });
     }
     return quotes;
