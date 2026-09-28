@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { DailyHistory } from '@/lib/history';
+import { SOURCE_CONFIGS } from './SourceToggle';
 
 interface HistoryListProps {
     historyData: DailyHistory[];
@@ -85,7 +86,7 @@ export default function HistoryList({ historyData, onClose }: HistoryListProps) 
                                             <span
                                                 className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
                                                 style={{
-                                                    backgroundColor: item.source === 'Bloomberg' ? 'var(--accent-bloomberg)' : item.source === 'Reuters' ? 'var(--accent-reuters)' : 'var(--accent-cnn)'
+                                                    backgroundColor: SOURCE_CONFIGS[item.source]?.color ?? 'var(--accent-cnn)'
                                                 }}
                                             >
                                                 {item.source}
