@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { MarketDef, WorldQuote, formatChange, formatPrice } from '@/lib/world-markets';
+import { MarketDef, WorldQuote, formatChange, formatPrice, getMarketStatus } from '@/lib/world-markets';
 
 const CHART_W = 100;
 const CHART_H = 40;
@@ -38,40 +38,59 @@ function IntradayChart({ history, previousClose, color }: { history: number[]; p
     );
 }
 
-export default function MarketTile({ def, quote, now }: { def: MarketDef; quote?: WorldQuote; now: Date }) {
+interface MarketTileProps {
+    def: MarketDef;
+    quote?: WorldQuote;
+    now: Date;
+    /** 横 8 つ表示用の小さいタイル */
+    dense?: boolean;
+}
+
+export default function MarketTile({ def, quote, now, dense = false }: MarketTileProps) {
     const direction = !quote ? 'flat' : quote.change > 0 ? 'up' : quote.change < 0 ? 'down' : 'flat';
     const color = direction === 'up' ? '#22c55e' : direction === 'down' ? '#ef4444' : '#9ca3af';
     const changeClass = direction === 'up' ? 'text-green-400' : direction === 'down' ? 'text-red-400' : 'text-gray-400';
+    const isOpen = quote ? getMarketStatus(quote, now) === 'open' : false;
+    const tradeTime = formatTradeTime(quote?.lastTradeAt, now);
 
     return (
-        <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-2.5 flex flex-col gap-1 min-w-0">
-            <div className="flex items-baseline justify-between gap-2 min-w-0">
-                <span className="text-xs font-bold text-gray-200 truncate" title={def.note ? `${def.name}（${def.note}）` : def.name}>
+        <div className={`rounded-lg border bg-[var(--card-bg)] flex flex-col min-w-0 ${
+            isOpen ? 'border-emerald-700/60' : 'border-[var(--card-border)]'
+        } ${dense ? 'p-1.5 gap-0.5' : 'p-2.5 gap-1'}`}>
+            <div className="flex items-center justify-between gap-1.5 min-w-0">
+                <span className={`font-bold text-gray-200 truncate ${dense ? 'text-[10px]' : 'text-xs'}`} title={def.note ? `${def.name}（${def.note}）` : def.name}>
                     {def.name}
                 </span>
-                <span className="text-[10px] font-mono text-[var(--text-secondary)] shrink-0">
-                    {formatTradeTime(quote?.lastTradeAt, now)}
+                <span
+                    className="flex items-center gap-1 text-[10px] font-mono text-[var(--text-secondary)] shrink-0"
+                    title={isOpen ? `取引中（最終 ${tradeTime}）` : `時間外（最終 ${tradeTime}）`}
+                >
+                    <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? 'bg-emerald-400 animate-pulse' : 'bg-gray-600'}`} />
+                    {!dense && tradeTime}
+                    <span className="sr-only">{isOpen ? '取引中' : '時間外'}</span>
                 </span>
             </div>
 
             {quote ? (
                 <>
-                    <div className={`text-xl font-bold font-mono leading-tight ${changeClass}`}>
+                    <div className={`font-bold font-mono leading-tight ${changeClass} ${dense ? 'text-sm' : 'text-xl'}`}>
                         {formatChange(quote.changePercent, 2)}%
                     </div>
-                    <div className="flex items-baseline justify-between gap-2 font-mono text-[11px] min-w-0">
+                    <div className={`flex items-baseline justify-between gap-2 font-mono min-w-0 ${dense ? 'text-[10px]' : 'text-[11px]'}`}>
                         <span className="text-gray-100 truncate">{formatPrice(quote.price, def)}</span>
-                        <span className={`${changeClass} shrink-0`}>{formatChange(quote.change, def.decimals ?? 2)}</span>
+                        {!dense && <span className={`${changeClass} shrink-0`}>{formatChange(quote.change, def.decimals ?? 2)}</span>}
                     </div>
-                    <div className="h-12 mt-0.5">
+                    <div className={dense ? 'h-8' : 'h-12 mt-0.5'}>
                         <IntradayChart history={quote.history} previousClose={quote.previousClose} color={color} />
                     </div>
                 </>
             ) : (
-                <div className="h-[92px] flex items-center justify-center text-xs text-[var(--text-secondary)]">取得できませんでした</div>
+                <div className={`flex items-center justify-center text-[var(--text-secondary)] ${dense ? 'h-[62px] text-[10px]' : 'h-[92px] text-xs'}`}>
+                    取得できませんでした
+                </div>
             )}
 
-            {def.note && <div className="text-[9px] text-[var(--text-secondary)] truncate">{def.note}</div>}
+            {def.note && !dense && <div className="text-[9px] text-[var(--text-secondary)] truncate">{def.note}</div>}
         </div>
     );
 }

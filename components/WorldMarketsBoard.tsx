@@ -2,11 +2,40 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { MARKETS, MarketRegion, REGIONS, WorldQuote } from '@/lib/world-markets';
+import { MARKETS, MarketRegion, REGIONS, WorldQuote, getMarketStatus } from '@/lib/world-markets';
 import MarketTile from './MarketTile';
 
 const REFRESH_MS = 60 * 1000;
 type Tab = 'all' | MarketRegion;
+type Layout = 'normal' | 'dense';
+
+const LAYOUT_STORAGE_KEY = 'vantage-point-markets-layout';
+// Tailwind はクラス名を静的に拾うので、組み立てずにそのまま書く
+const GRID_CLASSES: Record<Layout, string> = {
+    normal: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4',
+    dense: 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8',
+};
+const LAYOUTS: { id: Layout; label: string }[] = [
+    { id: 'normal', label: '横4つ' },
+    { id: 'dense', label: '横8つ' },
+];
+
+// 表示の好みは端末ごとでよいので localStorage。使えない環境（プライベートモード等）では既定のまま
+function readLayout(): Layout {
+    try {
+        return localStorage.getItem(LAYOUT_STORAGE_KEY) === 'dense' ? 'dense' : 'normal';
+    } catch {
+        return 'normal';
+    }
+}
+
+function saveLayout(layout: Layout) {
+    try {
+        localStorage.setItem(LAYOUT_STORAGE_KEY, layout);
+    } catch {
+        // 保存できなくても表示は切り替わる
+    }
+}
 
 export default function WorldMarketsBoard() {
     const [quotes, setQuotes] = useState<Record<string, WorldQuote>>({});
@@ -15,6 +44,17 @@ export default function WorldMarketsBoard() {
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<Tab>('all');
     const [now, setNow] = useState(() => new Date());
+    const [layout, setLayout] = useState<Layout>('normal');
+
+    // サーバー描画と食い違わないよう、保存値はマウント後に読む
+    useEffect(() => {
+        setLayout(readLayout());
+    }, []);
+
+    const changeLayout = (next: Layout) => {
+        setLayout(next);
+        saveLayout(next);
+    };
 
     const load = useCallback(async () => {
         try {
@@ -81,6 +121,27 @@ export default function WorldMarketsBoard() {
                     </div>
                 </div>
 
+                <div className="flex items-center justify-end gap-3">
+                    <div className="flex items-center gap-1 text-[10px] text-[var(--text-secondary)]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />取引中
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-600 ml-2" />時間外
+                    </div>
+                    <div className="flex items-center rounded-lg p-0.5 bg-[var(--card-bg)] border border-[var(--card-border)] text-xs" role="group" aria-label="表示の大きさ">
+                        {LAYOUTS.map(l => (
+                            <button
+                                key={l.id}
+                                onClick={() => changeLayout(l.id)}
+                                aria-pressed={layout === l.id}
+                                className={`px-2.5 py-1 rounded-md transition-colors ${
+                                    layout === l.id ? 'bg-blue-600 text-white font-bold' : 'text-gray-400 hover:text-gray-200'
+                                }`}
+                            >
+                                {l.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 <nav className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 [scrollbar-width:none]" aria-label="地域">
                     {[{ id: 'all' as Tab, label: 'すべて' }, ...REGIONS].map(r => (
                         <button
@@ -102,16 +163,24 @@ export default function WorldMarketsBoard() {
                 <div className="py-20 text-center text-sm text-[var(--text-secondary)]">読み込み中...</div>
             ) : (
                 <div className="space-y-6">
-                    {sections.map(section => (
-                        <section key={section.id}>
-                            <h2 className="text-sm font-bold text-gray-300 mb-2">{section.label}</h2>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
-                                {section.markets.map(def => (
-                                    <MarketTile key={def.symbol} def={def} quote={quotes[def.symbol]} now={now} />
-                                ))}
-                            </div>
-                        </section>
-                    ))}
+                    {sections.map(section => {
+                        const openCount = section.markets.filter(m => quotes[m.symbol] && getMarketStatus(quotes[m.symbol], now) === 'open').length;
+                        return (
+                            <section key={section.id}>
+                                <h2 className="text-sm font-bold text-gray-300 mb-2 flex items-baseline gap-2">
+                                    {section.label}
+                                    <span className="text-[10px] font-normal text-[var(--text-secondary)]">
+                                        取引中 {openCount}/{section.markets.length}
+                                    </span>
+                                </h2>
+                                <div className={`grid gap-2 ${GRID_CLASSES[layout]}`}>
+                                    {section.markets.map(def => (
+                                        <MarketTile key={def.symbol} def={def} quote={quotes[def.symbol]} now={now} dense={layout === 'dense'} />
+                                    ))}
+                                </div>
+                            </section>
+                        );
+                    })}
                 </div>
             )}
 
