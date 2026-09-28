@@ -147,8 +147,8 @@ async function fetchFromGoogleNewsRss(query: string, source: NewsSource, cleanSu
             // 媒体側のタイトルに付いている「 | ロイター」等も落とす
             return cleaned.replace(/\s*[|｜]\s*(ロイター|Reuters|ブルームバーグ|Bloomberg|CNN\.co\.jp|日本経済新聞)\s*$/i, '').trim();
         });
-    } catch (error: any) {
-        console.error(`Google News RSS fetch failed for ${source} (${query}):`, error.message);
+    } catch (error) {
+        console.error(`Google News RSS fetch failed for ${source} (${query}):`, error instanceof Error ? error.message : error);
         return [];
     }
 }
@@ -172,8 +172,8 @@ async function fetchFromWorRdf(rdfUrls: string[], source: NewsSource): Promise<N
                     allItems.push(item);
                 }
             }
-        } catch (error: any) {
-            console.error(`WOR RDF fetch failed for ${url}:`, error.message);
+        } catch (error) {
+            console.error(`WOR RDF fetch failed for ${url}:`, error instanceof Error ? error.message : error);
         }
     }
 
@@ -269,8 +269,8 @@ export async function fetchCryptoNews(): Promise<NewsItem[]> {
                     allItems.push(item);
                 }
             }
-        } catch (error: any) {
-            console.error(`Crypto RSS fetch failed for ${url}:`, error.message);
+        } catch (error) {
+            console.error(`Crypto RSS fetch failed for ${url}:`, error instanceof Error ? error.message : error);
         }
     }
 
