@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { NewsItem, NewsSource } from '@/lib/parser';
 import { NewsCategory, categorizeArticle } from '@/lib/categorizer';
 import { addBookmark, removeBookmark, getBookmarks, isBookmarked as checkBookmarked, BookmarkedItem } from '@/lib/bookmarks';
@@ -316,6 +317,16 @@ export default function Home() {
                                 <span>📅</span>
                                 <span className="hidden sm:inline">経済カレンダー</span>
                             </button>
+
+                            <Link
+                                href="/markets"
+                                className="header-action-btn text-xs px-2.5 gap-1"
+                                title="世界の市場"
+                                aria-label="世界の市場"
+                            >
+                                <span>🌐</span>
+                                <span className="hidden sm:inline">世界の市場</span>
+                            </Link>
 
                             {/* PWA Install Prompt */}
                             <PWAInstallPrompt />
