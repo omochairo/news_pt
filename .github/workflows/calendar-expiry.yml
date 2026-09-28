@@ -1,0 +1,22 @@
+name: Calendar expiry
+
+# 手動の経済指標予定表が切れる前に気づくための週次チェック。
+# 失敗すると GitHub から通知が届く（issue は起票しない）。
+on:
+  schedule:
+    - cron: '0 0 * * 1' # 毎週月曜 09:00 JST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --experimental-strip-types scripts/check-calendar-expiry.mjs 45

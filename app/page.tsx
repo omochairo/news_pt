@@ -19,6 +19,7 @@ import HistoryList from '@/components/HistoryList';
 import EconomicCalendar from '@/components/EconomicCalendar';
 import PWAInstallPrompt from '@/components/PWAInstallPrompt';
 import { saveToDailyHistory, getDailyHistory, DailyHistory } from '@/lib/history';
+import { compareByDateDesc } from '@/lib/feed';
 
 interface NewsData {
     nikkei?: NewsItem[];
@@ -190,14 +191,7 @@ export default function Home() {
 
         const filtered = filterItems(all);
 
-        return filtered.sort((a, b) => {
-            if (a.isoDate && b.isoDate) {
-                return new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime();
-            }
-            const timeA = a.time || '00:00';
-            const timeB = b.time || '00:00';
-            return timeB.localeCompare(timeA);
-        });
+        return filtered.sort(compareByDateDesc);
     }, [data, activeSources, filterItems]);
 
     // 全アイテム一覧（トレンド抽出用）

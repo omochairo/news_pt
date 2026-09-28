@@ -109,7 +109,7 @@ export default function TopStory({ item, onBookmark, isBookmarked, isRead, onMar
 
                     {/* Time */}
                     <span className="ml-auto text-xs text-[var(--text-secondary)] font-mono">
-                        {item.time || 'JUST NOW'}
+                        {item.time || '--:--'}
                     </span>
                 </div>
 

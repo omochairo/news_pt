@@ -25,14 +25,41 @@ interface CacheContainer {
 // メモリ内キャッシュ (サーバーが起動している間保持)
 let memoryCache: CacheContainer | null = null;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5分間キャッシュ
+// ?refresh=true は誰でも付けられるので、キャッシュがこれより新しい間は無視する（外部への連打で BAN されないように）
+const MIN_REFRESH_INTERVAL_MS = 60 * 1000;
+// 同時に来たリクエストが、それぞれ外部へ取りに行かないようにする
+let inflight: Promise<CacheContainer['data']> | null = null;
+
+async function fetchAllNews(): Promise<CacheContainer['data']> {
+    // Promise.allSettled で一部が失敗しても全滅しないように取得
+    const [nikkeiRes, minkabuRes, bloombergRes, reutersRes, cnnRes, cryptoRes] = await Promise.allSettled([
+        fetchNikkeiNews(),
+        fetchMinkabuFXNews(),
+        fetchBloombergNews(),
+        fetchReutersNews(),
+        fetchCNNNews(),
+        fetchCryptoNews(),
+    ]);
+
+    return {
+        nikkei: nikkeiRes.status === 'fulfilled' ? nikkeiRes.value : [],
+        minkabu: minkabuRes.status === 'fulfilled' ? minkabuRes.value : [],
+        bloomberg: bloombergRes.status === 'fulfilled' ? bloombergRes.value : [],
+        reuters: reutersRes.status === 'fulfilled' ? reutersRes.value : [],
+        cnn: cnnRes.status === 'fulfilled' ? cnnRes.value : [],
+        crypto: cryptoRes.status === 'fulfilled' ? cryptoRes.value : [],
+        updatedAt: new Date().toISOString(),
+    };
+}
 
 export async function GET(request: Request) {
     const now = Date.now();
     const url = new URL(request.url);
-    const forceRefresh = url.searchParams.get('refresh') === 'true';
+    const cacheAge = memoryCache ? now - memoryCache.timestamp : Infinity;
+    const forceRefresh = url.searchParams.get('refresh') === 'true' && cacheAge >= MIN_REFRESH_INTERVAL_MS;
 
     // 1. 有効なキャッシュがあれば即座に返却 (外部リクエストBAN防止)
-    if (!forceRefresh && memoryCache && now - memoryCache.timestamp < CACHE_TTL_MS) {
+    if (memoryCache && !forceRefresh && cacheAge < CACHE_TTL_MS) {
         return NextResponse.json(memoryCache.data, {
             headers: {
                 'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=600',
@@ -42,25 +69,10 @@ export async function GET(request: Request) {
     }
 
     try {
-        // 2. Promise.allSettled で一部が失敗しても全滅しないように取得
-        const [nikkeiRes, minkabuRes, bloombergRes, reutersRes, cnnRes, cryptoRes] = await Promise.allSettled([
-            fetchNikkeiNews(),
-            fetchMinkabuFXNews(),
-            fetchBloombergNews(),
-            fetchReutersNews(),
-            fetchCNNNews(),
-            fetchCryptoNews(),
-        ]);
-
-        const result = {
-            nikkei: nikkeiRes.status === 'fulfilled' ? nikkeiRes.value : [],
-            minkabu: minkabuRes.status === 'fulfilled' ? minkabuRes.value : [],
-            bloomberg: bloombergRes.status === 'fulfilled' ? bloombergRes.value : [],
-            reuters: reutersRes.status === 'fulfilled' ? reutersRes.value : [],
-            cnn: cnnRes.status === 'fulfilled' ? cnnRes.value : [],
-            crypto: cryptoRes.status === 'fulfilled' ? cryptoRes.value : [],
-            updatedAt: new Date().toISOString(),
-        };
+        if (!inflight) {
+            inflight = fetchAllNews().finally(() => { inflight = null; });
+        }
+        const result = await inflight;
 
         // キャッシュの更新
         memoryCache = {
