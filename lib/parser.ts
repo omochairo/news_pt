@@ -78,10 +78,20 @@ function parseDateInfo(pubDateStr?: string): { time: string; isoDate: string } {
     }
 }
 
+/** http(s) 以外のスキーム（javascript: など）のリンクを弾く */
+export function isSafeHttpUrl(url: string): boolean {
+    try {
+        const { protocol } = new URL(url);
+        return protocol === 'http:' || protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
 /**
  * RSS (RDF / RSS 2.0 / Atom) XML文字列から NewsItem[] をパースする共通ヘルパー
  */
-function parseRssXml(xmlData: string, defaultSource: NewsSource, titleCleaner?: (t: string) => string): NewsItem[] {
+export function parseRssXml(xmlData: string, defaultSource: NewsSource, titleCleaner?: (t: string) => string): NewsItem[] {
     const $ = cheerio.load(xmlData, { xmlMode: true });
     const news: NewsItem[] = [];
 
@@ -105,7 +115,7 @@ function parseRssXml(xmlData: string, defaultSource: NewsSource, titleCleaner?: 
             item.find('published').text().trim() ||
             item.find('updated').text().trim();
 
-        if (!title || !url || isNoisyTitle(title)) return;
+        if (!title || !url || !isSafeHttpUrl(url) || isNoisyTitle(title)) return;
 
         const { time, isoDate } = parseDateInfo(dateStr);
 
@@ -157,25 +167,34 @@ async function fetchFromGoogleNewsRss(query: string, source: NewsSource, cleanSu
  * assets.wor.jp (RSS愛好会) の RDF から記事を取得する共通関数
  */
 async function fetchFromWorRdf(rdfUrls: string[], source: NewsSource): Promise<NewsItem[]> {
+    return fetchRssUrls(rdfUrls, source, 'WOR RDF');
+}
+
+/**
+ * 複数の RSS URL を並列に取得し、URL の並び順を保ったまま重複を除いて結合する。
+ * 直列だと 1 本 8 秒のタイムアウトが URL 数だけ積み上がり、関数の実行上限を超えうる。
+ */
+async function fetchRssUrls(urls: string[], source: NewsSource, label: string): Promise<NewsItem[]> {
+    const results = await Promise.allSettled(
+        urls.map(url => axios.get(url, {
+            headers: { 'User-Agent': USER_AGENT },
+            timeout: 8000,
+        }))
+    );
+
     const allItems: NewsItem[] = [];
-
-    for (const url of rdfUrls) {
-        try {
-            const response = await axios.get(url, {
-                headers: { 'User-Agent': USER_AGENT },
-                timeout: 8000,
-            });
-
-            const parsed = parseRssXml(response.data, source);
-            for (const item of parsed) {
-                if (!allItems.some(n => n.url === item.url || n.title === item.title)) {
-                    allItems.push(item);
-                }
-            }
-        } catch (error) {
-            console.error(`WOR RDF fetch failed for ${url}:`, error instanceof Error ? error.message : error);
+    results.forEach((result, i) => {
+        if (result.status === 'rejected') {
+            const error = result.reason;
+            console.error(`${label} fetch failed for ${urls[i]}:`, error instanceof Error ? error.message : error);
+            return;
         }
-    }
+        for (const item of parseRssXml(result.value.data, source)) {
+            if (!allItems.some(n => n.url === item.url || n.title === item.title)) {
+                allItems.push(item);
+            }
+        }
+    });
 
     return allItems;
 }
@@ -254,25 +273,7 @@ export async function fetchCryptoNews(): Promise<NewsItem[]> {
         'https://www.coindeskjapan.com/feed/',
     ];
 
-    const allItems: NewsItem[] = [];
-
-    for (const url of cryptoRssUrls) {
-        try {
-            const response = await axios.get(url, {
-                headers: { 'User-Agent': USER_AGENT },
-                timeout: 8000,
-            });
-
-            const parsed = parseRssXml(response.data, 'Crypto');
-            for (const item of parsed) {
-                if (!allItems.some(n => n.url === item.url || n.title === item.title)) {
-                    allItems.push(item);
-                }
-            }
-        } catch (error) {
-            console.error(`Crypto RSS fetch failed for ${url}:`, error instanceof Error ? error.message : error);
-        }
-    }
+    const allItems = await fetchRssUrls(cryptoRssUrls, 'Crypto', 'Crypto RSS');
 
     if (allItems.length > 0) {
         return allItems.slice(0, 30);

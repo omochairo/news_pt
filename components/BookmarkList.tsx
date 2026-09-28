@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { BookmarkedItem, removeBookmark } from '@/lib/bookmarks';
+import { SOURCE_CONFIGS } from './SourceToggle';
 
 interface BookmarkListProps {
     bookmarks: BookmarkedItem[];
@@ -54,7 +55,7 @@ export default function BookmarkList({ bookmarks, onUpdate, onClose }: BookmarkL
                                         <span
                                             className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
                                             style={{
-                                                backgroundColor: bm.source === 'Bloomberg' ? 'var(--accent-bloomberg)' : bm.source === 'Reuters' ? 'var(--accent-reuters)' : 'var(--accent-cnn)'
+                                                backgroundColor: SOURCE_CONFIGS[bm.source]?.color ?? 'var(--accent-cnn)'
                                             }}
                                         >
                                             {bm.source}
