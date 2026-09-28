@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { NewsItem, NewsSource } from '@/lib/parser';
-import { NewsCategory, categorizeArticle, CATEGORIES } from '@/lib/categorizer';
-import SourceToggle, { ALL_SOURCES } from './SourceToggle';
+import { NewsCategory, categorizeArticle } from '@/lib/categorizer';
+import SourceToggle from './SourceToggle';
 import CategoryTabs from './CategoryTabs';
 import CompactNewsList from './CompactNewsList';
 
@@ -107,7 +107,7 @@ export default function SplitViewFeed({
     };
 
     // カテゴリカウント計算
-    const getCategoryCounts = (sources: Set<NewsSource>) => {
+    const getCategoryCounts = useCallback((sources: Set<NewsSource>) => {
         const raw: NewsItem[] = [];
         if (data) {
             if (sources.has('Nikkei')) raw.push(...(data.nikkei || []));
@@ -125,10 +125,10 @@ export default function SplitViewFeed({
             if (cat !== 'all') counts[cat]++;
         });
         return counts;
-    };
+    }, [data]);
 
-    const leftCategoryCounts = useMemo(() => getCategoryCounts(leftState.sources), [leftState.sources, data]);
-    const rightCategoryCounts = useMemo(() => getCategoryCounts(rightState.sources), [rightState.sources, data]);
+    const leftCategoryCounts = useMemo(() => getCategoryCounts(leftState.sources), [leftState.sources, getCategoryCounts]);
+    const rightCategoryCounts = useMemo(() => getCategoryCounts(rightState.sources), [rightState.sources, getCategoryCounts]);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">

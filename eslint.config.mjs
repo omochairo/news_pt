@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 手元の調査用スクリプト（アプリ本体からは読み込まない）
+    "scripts/**",
+    "test-gf.js",
   ]),
 ]);
 

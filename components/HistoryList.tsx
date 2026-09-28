@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo } from 'react';
 import { DailyHistory } from '@/lib/history';
-import { NewsItem } from '@/lib/parser';
 
 interface HistoryListProps {
     historyData: DailyHistory[];
