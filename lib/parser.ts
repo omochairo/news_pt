@@ -37,20 +37,15 @@ function isNoisyTitle(title: string): boolean {
     return NOISE_PATTERNS.some(pattern => pattern.test(title));
 }
 
-/** 日付オブジェクトから日本時間の表示用文字列とISO文字列を返す */
-function parseDateInfo(pubDateStr?: string): { time: string; isoDate: string } {
-    const now = new Date();
-    let dateObj = now;
-
-    if (pubDateStr) {
-        try {
-            const parsed = new Date(pubDateStr);
-            if (!isNaN(parsed.getTime())) {
-                dateObj = parsed;
-            }
-        } catch {
-            dateObj = now;
-        }
+/**
+ * 日付オブジェクトから日本時間の表示用文字列とISO文字列を返す。
+ * 日付が無い・読めない記事は取得時刻で埋めない（古い記事が「最新」として先頭に出るため）。
+ * その場合 isoDate は undefined で、並べ替えでは末尾に回る。
+ */
+export function parseDateInfo(pubDateStr?: string, now: Date = new Date()): { time: string; isoDate?: string } {
+    const dateObj = pubDateStr ? new Date(pubDateStr) : null;
+    if (!dateObj || isNaN(dateObj.getTime())) {
+        return { time: '' };
     }
 
     const isoDate = dateObj.toISOString();

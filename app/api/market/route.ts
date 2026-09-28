@@ -37,7 +37,7 @@ async function fetchFromGoogleFinance(gfSymbol: string): Promise<Quote | null> {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept-Language': 'en-US,en;q=0.9',
             },
-            timeout: 8000,
+            timeout: 4000,
         });
 
         const $ = cheerio.load(resp.data);
@@ -77,7 +77,7 @@ async function fetchYahooChart(symbol: string, range: string, interval: string) 
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
-        timeout: 5000,
+        timeout: 3000,
     });
     const result = response.data?.chart?.result?.[0];
     const closes: unknown[] = result?.indicators?.quote?.[0]?.close || [];
@@ -134,21 +134,35 @@ const YAHOO_SYMBOLS: Record<string, string> = {
     'CL=F': 'CL=F',
 };
 
+// 1銘柄あたりの上限。Yahoo(1d→5d) → Google と順に試すので、個々のタイムアウトだけでは合計が膨らむ
+const SYMBOL_DEADLINE_MS = 7000;
+
+function withDeadline<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<T>(resolve => { timer = setTimeout(() => resolve(fallback), ms); });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+async function fetchQuote(gfSymbol: string): Promise<Quote | null> {
+    const yahooSymbol = YAHOO_SYMBOLS[gfSymbol];
+    let quote: Quote | null = null;
+
+    // 1. まず Yahoo Finance (高精度・公式API) を試す
+    if (yahooSymbol) {
+        quote = await fetchFromYahooChart(yahooSymbol);
+    }
+
+    // 2. 失敗したら Google Finance (スクレイピング) にフォールバック
+    if (!quote && !gfSymbol.includes('=')) {
+        quote = await fetchFromGoogleFinance(gfSymbol);
+    }
+    return quote;
+}
+
 async function fetchMarketData(): Promise<MarketData[]> {
     const results = await Promise.allSettled(
         GOOGLE_FINANCE_SYMBOLS.map(async (s) => {
-            const yahooSymbol = YAHOO_SYMBOLS[s.gfSymbol];
-            let quote: Quote | null = null;
-
-            // 1. まず Yahoo Finance (高精度・公式API) を試す
-            if (yahooSymbol) {
-                quote = await fetchFromYahooChart(yahooSymbol);
-            }
-
-            // 2. 失敗したら Google Finance (スクレイピング) にフォールバック
-            if (!quote && !s.gfSymbol.includes('=')) {
-                quote = await fetchFromGoogleFinance(s.gfSymbol);
-            }
+            const quote = await withDeadline(fetchQuote(s.gfSymbol), SYMBOL_DEADLINE_MS, null);
 
             if (quote && quote.price > 0) {
                 return {

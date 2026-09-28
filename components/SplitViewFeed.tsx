@@ -1,224 +1,111 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { NewsItem, NewsSource } from '@/lib/parser';
 import { NewsCategory, categorizeArticle } from '@/lib/categorizer';
+import { FeedData, collectBySources, compareByDateDesc, countByCategory } from '@/lib/feed';
 import SourceToggle from './SourceToggle';
 import CategoryTabs from './CategoryTabs';
 import CompactNewsList from './CompactNewsList';
 
 interface SplitViewFeedProps {
-    data: {
-        nikkei?: NewsItem[];
-        minkabu?: NewsItem[];
-        bloomberg?: NewsItem[];
-        reuters?: NewsItem[];
-        cnn?: NewsItem[];
-        crypto?: NewsItem[];
-    } | null;
+    data: FeedData | null;
     onBookmark?: (item: NewsItem) => void;
     bookmarkedUrls?: Set<string>;
     readUrls?: Set<string>;
     onMarkRead?: (url: string) => void;
 }
 
-interface PanelState {
-    sources: Set<NewsSource>;
-    category: NewsCategory;
-    search: string;
+interface FeedPanelProps extends SplitViewFeedProps {
+    label: 'A' | 'B';
+    initialSources: NewsSource[];
 }
 
-export default function SplitViewFeed({
-    data,
-    onBookmark,
-    bookmarkedUrls,
-    readUrls,
-    onMarkRead,
-}: SplitViewFeedProps) {
-    // 左パネルと右パネルの個別ステート
-    const [leftState, setLeftState] = useState<PanelState>({
-        sources: new Set(['Nikkei', 'MinkabuFX', 'Bloomberg', 'Reuters', 'CNN']),
-        category: 'all',
-        search: '',
-    });
+// Tailwind はクラス名を静的に拾うので、組み立てずにそのまま書く
+const PANEL_STYLES = {
+    A: { border: 'border-blue-500', text: 'text-blue-400', dot: 'bg-blue-500' },
+    B: { border: 'border-amber-500', text: 'text-amber-400', dot: 'bg-amber-500' },
+} as const;
 
-    const [rightState, setRightState] = useState<PanelState>({
-        sources: new Set(['Crypto']),
-        category: 'all',
-        search: '',
-    });
+function FeedPanel({ label, initialSources, data, onBookmark, bookmarkedUrls, readUrls, onMarkRead }: FeedPanelProps) {
+    const [sources, setSources] = useState<Set<NewsSource>>(() => new Set(initialSources));
+    const [category, setCategory] = useState<NewsCategory>('all');
+    const [search, setSearch] = useState('');
 
-    // フィルタリング処理関数
-    const getFilteredItems = useCallback((panel: PanelState) => {
-        if (!data) return [];
-        const items: NewsItem[] = [];
+    const sourceItems = useMemo(() => collectBySources(data, sources), [data, sources]);
+    const categoryCounts = useMemo(() => countByCategory(sourceItems), [sourceItems]);
 
-        if (panel.sources.has('Nikkei')) items.push(...(data.nikkei || []));
-        if (panel.sources.has('MinkabuFX')) items.push(...(data.minkabu || []));
-        if (panel.sources.has('Crypto')) items.push(...(data.crypto || []));
-        if (panel.sources.has('Bloomberg')) items.push(...(data.bloomberg || []));
-        if (panel.sources.has('Reuters')) items.push(...(data.reuters || []));
-        if (panel.sources.has('CNN')) items.push(...(data.cnn || []));
-
-        let filtered = items;
-        if (panel.search) {
-            const query = panel.search.toLowerCase();
+    const items = useMemo(() => {
+        let filtered = sourceItems;
+        if (search) {
+            const query = search.toLowerCase();
             filtered = filtered.filter(i => i.title.toLowerCase().includes(query));
         }
-        if (panel.category !== 'all') {
-            filtered = filtered.filter(i => categorizeArticle(i.title) === panel.category);
+        if (category !== 'all') {
+            filtered = filtered.filter(i => categorizeArticle(i.title) === category);
         }
+        return [...filtered].sort(compareByDateDesc);
+    }, [sourceItems, search, category]);
 
-        return filtered.sort((a, b) => {
-            if (a.isoDate && b.isoDate) {
-                return new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime();
-            }
-            return (b.time || '00:00').localeCompare(a.time || '00:00');
-        });
-    }, [data]);
-
-    const leftItems = useMemo(() => getFilteredItems(leftState), [leftState, getFilteredItems]);
-    const rightItems = useMemo(() => getFilteredItems(rightState), [rightState, getFilteredItems]);
-
-    // 左パネル ソーストグル
-    const handleLeftSourceToggle = (source: NewsSource) => {
-        setLeftState(prev => {
-            const next = new Set(prev.sources);
+    // 最後の1媒体は外せない
+    const handleSourceToggle = (source: NewsSource) => {
+        setSources(prev => {
+            const next = new Set(prev);
             if (next.has(source)) {
                 if (next.size > 1) next.delete(source);
             } else {
                 next.add(source);
             }
-            return { ...prev, sources: next };
+            return next;
         });
     };
 
-    // 右パネル ソーストグル
-    const handleRightSourceToggle = (source: NewsSource) => {
-        setRightState(prev => {
-            const next = new Set(prev.sources);
-            if (next.has(source)) {
-                if (next.size > 1) next.delete(source);
-            } else {
-                next.add(source);
-            }
-            return { ...prev, sources: next };
-        });
-    };
-
-    // カテゴリカウント計算
-    const getCategoryCounts = useCallback((sources: Set<NewsSource>) => {
-        const raw: NewsItem[] = [];
-        if (data) {
-            if (sources.has('Nikkei')) raw.push(...(data.nikkei || []));
-            if (sources.has('MinkabuFX')) raw.push(...(data.minkabu || []));
-            if (sources.has('Crypto')) raw.push(...(data.crypto || []));
-            if (sources.has('Bloomberg')) raw.push(...(data.bloomberg || []));
-            if (sources.has('Reuters')) raw.push(...(data.reuters || []));
-            if (sources.has('CNN')) raw.push(...(data.cnn || []));
-        }
-        const counts: Record<NewsCategory, number> = {
-            all: raw.length, fx: 0, stocks: 0, bonds: 0, commodities: 0, crypto: 0, economy: 0,
-        };
-        raw.forEach(i => {
-            const cat = categorizeArticle(i.title);
-            if (cat !== 'all') counts[cat]++;
-        });
-        return counts;
-    }, [data]);
-
-    const leftCategoryCounts = useMemo(() => getCategoryCounts(leftState.sources), [leftState.sources, getCategoryCounts]);
-    const rightCategoryCounts = useMemo(() => getCategoryCounts(rightState.sources), [rightState.sources, getCategoryCounts]);
+    const style = PANEL_STYLES[label];
 
     return (
+        <div className="space-y-4">
+            <div className={`glass-panel p-4 border-l-4 ${style.border} space-y-3`}>
+                <div className="flex items-center justify-between">
+                    <span className={`font-mono font-bold text-xs ${style.text} uppercase tracking-widest flex items-center gap-1.5`}>
+                        <span className={`w-2 h-2 rounded-full ${style.dot} animate-pulse`} />
+                        PANEL {label} — MONITOR
+                    </span>
+                    <span className="text-[10px] font-mono text-[var(--text-secondary)]">
+                        {items.length} ITEMS
+                    </span>
+                </div>
+
+                <SourceToggle activeSources={sources} onToggle={handleSourceToggle} />
+
+                <input
+                    type="text"
+                    placeholder={`パネル${label}を検索...`}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="search-input text-xs py-1.5"
+                />
+
+                <CategoryTabs activeCategory={category} onCategoryChange={setCategory} counts={categoryCounts} />
+            </div>
+
+            <CompactNewsList
+                items={items}
+                title={`パネル ${label} タイムライン`}
+                source="mixed"
+                onBookmark={onBookmark}
+                bookmarkedUrls={bookmarkedUrls}
+                readUrls={readUrls}
+                onMarkRead={onMarkRead}
+            />
+        </div>
+    );
+}
+
+export default function SplitViewFeed(props: SplitViewFeedProps) {
+    return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
-            {/* 左パネル (Panel A) */}
-            <div className="space-y-4">
-                <div className="glass-panel p-4 border-l-4 border-blue-500 space-y-3">
-                    <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-xs text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                            PANEL A — MONITOR
-                        </span>
-                        <span className="text-[10px] font-mono text-[var(--text-secondary)]">
-                            {leftItems.length} ITEMS
-                        </span>
-                    </div>
-
-                    <SourceToggle
-                        activeSources={leftState.sources}
-                        onToggle={handleLeftSourceToggle}
-                    />
-
-                    <input
-                        type="text"
-                        placeholder="パネルAを検索..."
-                        value={leftState.search}
-                        onChange={(e) => setLeftState(p => ({ ...p, search: e.target.value }))}
-                        className="search-input text-xs py-1.5"
-                    />
-
-                    <CategoryTabs
-                        activeCategory={leftState.category}
-                        onCategoryChange={(c) => setLeftState(p => ({ ...p, category: c }))}
-                        counts={leftCategoryCounts}
-                    />
-                </div>
-
-                <CompactNewsList
-                    items={leftItems}
-                    title="パネル A タイムライン"
-                    source="mixed"
-                    onBookmark={onBookmark}
-                    bookmarkedUrls={bookmarkedUrls}
-                    readUrls={readUrls}
-                    onMarkRead={onMarkRead}
-                />
-            </div>
-
-            {/* 右パネル (Panel B) */}
-            <div className="space-y-4">
-                <div className="glass-panel p-4 border-l-4 border-amber-500 space-y-3">
-                    <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-xs text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                            PANEL B — MONITOR
-                        </span>
-                        <span className="text-[10px] font-mono text-[var(--text-secondary)]">
-                            {rightItems.length} ITEMS
-                        </span>
-                    </div>
-
-                    <SourceToggle
-                        activeSources={rightState.sources}
-                        onToggle={handleRightSourceToggle}
-                    />
-
-                    <input
-                        type="text"
-                        placeholder="パネルBを検索..."
-                        value={rightState.search}
-                        onChange={(e) => setRightState(p => ({ ...p, search: e.target.value }))}
-                        className="search-input text-xs py-1.5"
-                    />
-
-                    <CategoryTabs
-                        activeCategory={rightState.category}
-                        onCategoryChange={(c) => setRightState(p => ({ ...p, category: c }))}
-                        counts={rightCategoryCounts}
-                    />
-                </div>
-
-                <CompactNewsList
-                    items={rightItems}
-                    title="パネル B タイムライン"
-                    source="mixed"
-                    onBookmark={onBookmark}
-                    bookmarkedUrls={bookmarkedUrls}
-                    readUrls={readUrls}
-                    onMarkRead={onMarkRead}
-                />
-            </div>
+            <FeedPanel {...props} label="A" initialSources={['Nikkei', 'MinkabuFX', 'Bloomberg', 'Reuters', 'CNN']} />
+            <FeedPanel {...props} label="B" initialSources={['Crypto']} />
         </div>
     );
 }
