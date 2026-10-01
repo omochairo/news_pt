@@ -44,9 +44,12 @@ interface MarketTileProps {
     now: Date;
     /** 横 8 つ表示用の小さいタイル */
     dense?: boolean;
+    favorite?: boolean;
+    /** 渡したときだけ ☆ を出す */
+    onToggleFavorite?: (symbol: string) => void;
 }
 
-export default function MarketTile({ def, quote, now, dense = false }: MarketTileProps) {
+export default function MarketTile({ def, quote, now, dense = false, favorite = false, onToggleFavorite }: MarketTileProps) {
     const direction = !quote ? 'flat' : quote.change > 0 ? 'up' : quote.change < 0 ? 'down' : 'flat';
     const color = direction === 'up' ? '#22c55e' : direction === 'down' ? '#ef4444' : '#9ca3af';
     const changeClass = direction === 'up' ? 'text-green-400' : direction === 'down' ? 'text-red-400' : 'text-gray-400';
@@ -58,8 +61,24 @@ export default function MarketTile({ def, quote, now, dense = false }: MarketTil
             isOpen ? 'border-emerald-700/60' : 'border-[var(--card-border)]'
         } ${dense ? 'p-1.5 gap-0.5' : 'p-2.5 gap-1'}`}>
             <div className="flex items-center justify-between gap-1.5 min-w-0">
-                <span className={`font-bold text-gray-200 truncate ${dense ? 'text-[10px]' : 'text-xs'}`} title={def.note ? `${def.name}（${def.note}）` : def.name}>
-                    {def.name}
+                <span className="flex items-center gap-1 min-w-0">
+                    {onToggleFavorite && (
+                        <button
+                            type="button"
+                            onClick={() => onToggleFavorite(def.symbol)}
+                            aria-pressed={favorite}
+                            aria-label={favorite ? `${def.name}をお気に入りから外す` : `${def.name}をお気に入りに追加`}
+                            title={favorite ? 'お気に入りから外す' : 'お気に入りに追加'}
+                            className={`shrink-0 leading-none transition-colors ${dense ? 'text-[10px]' : 'text-xs'} ${
+                                favorite ? 'text-amber-400' : 'text-gray-600 hover:text-gray-300'
+                            }`}
+                        >
+                            {favorite ? '★' : '☆'}
+                        </button>
+                    )}
+                    <span className={`font-bold text-gray-200 truncate ${dense ? 'text-[10px]' : 'text-xs'}`} title={def.note ? `${def.name}（${def.note}）` : def.name}>
+                        {def.name}
+                    </span>
                 </span>
                 <span
                     className="flex items-center gap-1 text-[10px] font-mono text-[var(--text-secondary)] shrink-0"

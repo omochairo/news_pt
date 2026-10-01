@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { MARKETS, MarketRegion, REGIONS, WorldQuote, getMarketStatus } from '@/lib/world-markets';
 import { usePolling } from '@/lib/use-polling';
+import { readFavorites, saveFavorites, toggleFavorite } from '@/lib/favorites';
 import MarketTile from './MarketTile';
 import Markets24hView from './Markets24hView';
 
@@ -47,10 +48,20 @@ export default function WorldMarketsBoard() {
     const [tab, setTab] = useState<Tab>('all');
     const [now, setNow] = useState(() => new Date());
     const [layout, setLayout] = useState<Layout>('normal');
+    const [favorites, setFavorites] = useState<string[]>([]);
 
     // サーバー描画と食い違わないよう、保存値はマウント後に読む
     useEffect(() => {
         setLayout(readLayout());
+        setFavorites(readFavorites());
+    }, []);
+
+    const onToggleFavorite = useCallback((symbol: string) => {
+        setFavorites(prev => {
+            const next = toggleFavorite(prev, symbol);
+            saveFavorites(next);
+            return next;
+        });
     }, []);
 
     const changeLayout = (next: Layout) => {
@@ -78,12 +89,15 @@ export default function WorldMarketsBoard() {
     // 1分ごとに更新（タブが裏にある間は止まる）。24時間タブの間はそちらが取得するので止める
     usePolling(load, REFRESH_MS, tab !== '24h');
 
-    const sections = useMemo(
-        () => REGIONS
+    const sections = useMemo(() => {
+        const regions = REGIONS
             .filter(r => tab === 'all' || r.id === tab)
-            .map(r => ({ ...r, markets: MARKETS.filter(m => m.region === r.id) })),
-        [tab],
-    );
+            .map(r => ({ id: r.id as string, label: r.label, markets: MARKETS.filter(m => m.region === r.id) }));
+        // お気に入りは「すべて」の先頭にだけ出す（各地域の中にも残る）
+        if (tab !== 'all' || favorites.length === 0) return regions;
+        const picked = new Set(favorites);
+        return [{ id: 'favorites', label: 'お気に入り', markets: MARKETS.filter(m => picked.has(m.symbol)) }, ...regions];
+    }, [tab, favorites]);
 
     const updatedLabel = updatedAt
         ? new Date(updatedAt).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -165,7 +179,15 @@ export default function WorldMarketsBoard() {
                                 </h2>
                                 <div className={`grid gap-2 ${GRID_CLASSES[layout]}`}>
                                     {section.markets.map(def => (
-                                        <MarketTile key={def.symbol} def={def} quote={quotes[def.symbol]} now={now} dense={layout === 'dense'} />
+                                        <MarketTile
+                                            key={def.symbol}
+                                            def={def}
+                                            quote={quotes[def.symbol]}
+                                            now={now}
+                                            dense={layout === 'dense'}
+                                            favorite={favorites.includes(def.symbol)}
+                                            onToggleFavorite={onToggleFavorite}
+                                        />
                                     ))}
                                 </div>
                             </section>
@@ -175,7 +197,7 @@ export default function WorldMarketsBoard() {
             )}
 
             <p className="mt-8 text-[10px] text-[var(--text-secondary)] leading-relaxed">
-                データは Yahoo Finance から取得しています。指数は 15〜20 分程度遅れることがあります。点線は前日終値。
+                データは Yahoo Finance から取得しています。指数は 15〜20 分程度遅れることがあります。点線は前日終値。☆ で選んだ銘柄は「すべて」の先頭に出ます（この端末にだけ保存）。
                 TOPIX・グロース250 は連動 ETF、全世界株式は ETF ACWI の値です。
             </p>
         </main>
