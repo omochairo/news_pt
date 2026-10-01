@@ -2,6 +2,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { HISTORY_RANGES, HistoryRange, MarketDef, QuoteHistory, WorldQuote, formatChange, formatPrice } from '@/lib/world-markets';
+import { RELATED_SYMBOLS, pickRelatedNews } from '@/lib/related-news';
+import type { NewsItem } from '@/lib/parser';
 
 const W = 600;
 const H = 220;
@@ -28,6 +30,65 @@ function DetailChart({ history, color }: { history: QuoteHistory; color: string 
             <line x1={0} x2={W} y1={baseY} y2={baseY} stroke="#6b7a8d" strokeWidth={1} strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
             <polyline points={line} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         </svg>
+    );
+}
+
+// ニュース画面と同じ /api/news（サーバー側で 5 分キャッシュ）を使う。開くたびには取り直さない
+const NEWS_TTL_MS = 5 * 60 * 1000;
+let newsCache: { items: NewsItem[]; fetchedAt: number } | null = null;
+
+async function loadNews(): Promise<NewsItem[]> {
+    if (newsCache && Date.now() - newsCache.fetchedAt < NEWS_TTL_MS) return newsCache.items;
+    const res = await fetch('/api/news');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body: Record<string, unknown> = await res.json();
+    const items = Object.values(body)
+        .filter((v): v is NewsItem[] => Array.isArray(v))
+        .flat()
+        // 日付の無い記事は後ろへ
+        .sort((a, b) => (b.isoDate ?? '').localeCompare(a.isoDate ?? ''));
+    newsCache = { items, fetchedAt: Date.now() };
+    return items;
+}
+
+function RelatedNews({ symbol }: { symbol: string }) {
+    const [items, setItems] = useState<NewsItem[] | 'error' | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        loadNews()
+            .then(all => { if (!cancelled) setItems(pickRelatedNews(all, symbol)); })
+            .catch(() => { if (!cancelled) setItems('error'); });
+        return () => { cancelled = true; };
+    }, [symbol]);
+
+    return (
+        <section className="pt-3 border-t border-[var(--card-border)]">
+            <h3 className="text-xs font-bold text-gray-300 mb-2">関連ニュース</h3>
+            {items === null ? (
+                <p className="text-[11px] text-[var(--text-secondary)]">読み込み中...</p>
+            ) : items === 'error' ? (
+                <p className="text-[11px] text-[var(--text-secondary)]">ニュースを取得できませんでした</p>
+            ) : items.length === 0 ? (
+                <p className="text-[11px] text-[var(--text-secondary)]">いま取得しているニュースには見当たりません</p>
+            ) : (
+                <ul className="space-y-1.5 max-h-56 overflow-y-auto">
+                    {items.map(item => (
+                        <li key={item.url}>
+                            <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block text-xs leading-snug text-gray-200 hover:text-white hover:underline"
+                            >
+                                {item.title}
+                                <span className="ml-1.5 text-[10px] font-mono text-[var(--text-secondary)]">{item.source} {item.time}</span>
+                            </a>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </section>
     );
 }
 
@@ -162,6 +223,9 @@ export default function MarketDetailDialog({ def, quote, onClose }: Props) {
                         )}
                     </div>
                     <p className="text-[10px] text-[var(--text-secondary)]">点線は期間の始値。時刻は日本時間。</p>
+
+                    {/* 見出しから銘柄を判定できる銘柄だけ */}
+                    {RELATED_SYMBOLS.has(def.symbol) && <RelatedNews key={def.symbol} symbol={def.symbol} />}
                 </div>
             )}
         </dialog>
