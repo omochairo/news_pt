@@ -68,3 +68,19 @@ self.addEventListener('fetch', (event) => {
         })
     );
 });
+
+// 変動通知（components/MoveAlerts.tsx）を押したら、開いているタブを前に出す。無ければ開く
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const url = (event.notification.data && event.notification.data.url) || '/';
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+            const target = new URL(url, self.location.origin).href;
+            const existing = windows.find((w) => w.url === target) || windows[0];
+            if (existing) {
+                return existing.focus().then((w) => (w && w.url !== target && 'navigate' in w ? w.navigate(target) : w));
+            }
+            return self.clients.openWindow(target);
+        })
+    );
+});
