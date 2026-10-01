@@ -7,6 +7,7 @@ import { usePolling } from '@/lib/use-polling';
 import { readFavorites, saveFavorites, toggleFavorite } from '@/lib/favorites';
 import MarketTile from './MarketTile';
 import Markets24hView from './Markets24hView';
+import MarketDetailDialog from './MarketDetailDialog';
 
 const REFRESH_MS = 60 * 1000;
 type Tab = 'all' | MarketRegion | '24h';
@@ -49,6 +50,7 @@ export default function WorldMarketsBoard() {
     const [now, setNow] = useState(() => new Date());
     const [layout, setLayout] = useState<Layout>('normal');
     const [favorites, setFavorites] = useState<string[]>([]);
+    const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
 
     // サーバー描画と食い違わないよう、保存値はマウント後に読む
     useEffect(() => {
@@ -187,6 +189,7 @@ export default function WorldMarketsBoard() {
                                             dense={layout === 'dense'}
                                             favorite={favorites.includes(def.symbol)}
                                             onToggleFavorite={onToggleFavorite}
+                                            onOpen={setDetailSymbol}
                                         />
                                     ))}
                                 </div>
@@ -196,8 +199,14 @@ export default function WorldMarketsBoard() {
                 </div>
             )}
 
+            <MarketDetailDialog
+                def={MARKETS.find(m => m.symbol === detailSymbol) ?? null}
+                quote={detailSymbol ? quotes[detailSymbol] : undefined}
+                onClose={() => setDetailSymbol(null)}
+            />
+
             <p className="mt-8 text-[10px] text-[var(--text-secondary)] leading-relaxed">
-                データは Yahoo Finance から取得しています。指数は 15〜20 分程度遅れることがあります。点線は前日終値。☆ で選んだ銘柄は「すべて」の先頭に出ます（この端末にだけ保存）。
+                データは Yahoo Finance から取得しています。指数は 15〜20 分程度遅れることがあります。点線は前日終値。☆ で選んだ銘柄は「すべて」の先頭に出ます（この端末にだけ保存）。タイルを押すと 5 日・1 か月・1 年のチャートが開きます。
                 TOPIX・グロース250 は連動 ETF、全世界株式は ETF ACWI の値です。
             </p>
         </main>

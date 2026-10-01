@@ -47,25 +47,45 @@ interface MarketTileProps {
     favorite?: boolean;
     /** 渡したときだけ ☆ を出す */
     onToggleFavorite?: (symbol: string) => void;
+    /** 渡したときだけタイルを押せるようにする（詳細チャート） */
+    onOpen?: (symbol: string) => void;
 }
 
-export default function MarketTile({ def, quote, now, dense = false, favorite = false, onToggleFavorite }: MarketTileProps) {
+export default function MarketTile({ def, quote, now, dense = false, favorite = false, onToggleFavorite, onOpen }: MarketTileProps) {
     const direction = !quote ? 'flat' : quote.change > 0 ? 'up' : quote.change < 0 ? 'down' : 'flat';
     const color = direction === 'up' ? '#22c55e' : direction === 'down' ? '#ef4444' : '#9ca3af';
     const changeClass = direction === 'up' ? 'text-green-400' : direction === 'down' ? 'text-red-400' : 'text-gray-400';
     const isOpen = quote ? getMarketStatus(quote, now) === 'open' : false;
     const tradeTime = formatTradeTime(quote?.lastTradeAt, now);
 
+    // ☆ ボタンを中に持つので、タイル全体は button にせず role で押せるようにする
+    const openProps = onOpen ? {
+        role: 'button',
+        tabIndex: 0,
+        'aria-label': `${def.name}の詳細チャートを開く`,
+        onClick: () => onOpen(def.symbol),
+        onKeyDown: (e: React.KeyboardEvent) => {
+            if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+            e.preventDefault();
+            onOpen(def.symbol);
+        },
+    } : {};
+
     return (
-        <div className={`rounded-lg border bg-[var(--card-bg)] flex flex-col min-w-0 ${
+        <div {...openProps} className={`rounded-lg border bg-[var(--card-bg)] flex flex-col min-w-0 ${
             isOpen ? 'border-emerald-700/60' : 'border-[var(--card-border)]'
-        } ${dense ? 'p-1.5 gap-0.5' : 'p-2.5 gap-1'}`}>
+        } ${dense ? 'p-1.5 gap-0.5' : 'p-2.5 gap-1'} ${
+            onOpen ? 'cursor-pointer hover:bg-[var(--card-bg-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500' : ''
+        }`}>
             <div className="flex items-center justify-between gap-1.5 min-w-0">
                 <span className="flex items-center gap-1 min-w-0">
                     {onToggleFavorite && (
                         <button
                             type="button"
-                            onClick={() => onToggleFavorite(def.symbol)}
+                            onClick={e => {
+                                e.stopPropagation();
+                                onToggleFavorite(def.symbol);
+                            }}
                             aria-pressed={favorite}
                             aria-label={favorite ? `${def.name}をお気に入りから外す` : `${def.name}をお気に入りに追加`}
                             title={favorite ? 'お気に入りから外す' : 'お気に入りに追加'}
