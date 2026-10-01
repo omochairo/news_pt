@@ -59,6 +59,8 @@ export default function MarketDetailDialog({ def, quote, onClose }: Props) {
 
     const key = def ? `${def.symbol}|${range}` : '';
     const history = key ? histories[key] : undefined;
+    // 「再読み込み」で結果を消したときにも取り直すよう、未取得かどうかを依存に入れる
+    const missing = history === undefined;
 
     useEffect(() => {
         if (!def || histories[key]) return;
@@ -70,7 +72,7 @@ export default function MarketDetailDialog({ def, quote, onClose }: Props) {
         return () => { cancelled = true; };
         // histories は結果を書き込むだけなので依存に入れない（入れると取得のたびに再実行される）
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [def, range]);
+    }, [def, range, missing]);
 
     const retry = () => setHistories(prev => {
         const next = { ...prev };
