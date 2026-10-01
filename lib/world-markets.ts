@@ -256,3 +256,59 @@ export function parse24h(body: unknown): Quote24h[] {
     }
     return quotes;
 }
+
+/** 詳細チャートの期間。interval は Yahoo の足の長さ */
+export const HISTORY_RANGES = [
+    { id: '5d', label: '5日', interval: '30m' },
+    { id: '1mo', label: '1か月', interval: '1h' },
+    { id: '1y', label: '1年', interval: '1d' },
+] as const;
+export type HistoryRange = (typeof HISTORY_RANGES)[number]['id'];
+
+export interface QuoteHistory {
+    symbol: string;
+    range: HistoryRange;
+    points: { t: string; v: number }[];   // 古い順・間引き済み（t は ISO）
+    first: number;
+    last: number;
+    change: number;
+    changePercent: number;
+    high: number;
+    low: number;
+}
+
+export const DETAIL_MAX_POINTS = 160;
+
+/** 1 銘柄分の spark 応答から、期間の推移と騰落・高安を出す。足が 2 本未満なら null */
+export function parseHistory(body: unknown, symbol: string, range: HistoryRange): QuoteHistory | null {
+    const raw = body && typeof body === 'object' ? (body as Record<string, SparkEntry>)[symbol] : undefined;
+    if (!raw || typeof raw !== 'object') return null;
+    const closes = Array.isArray(raw.close) ? raw.close : [];
+    const stamps = Array.isArray(raw.timestamp) ? raw.timestamp : [];
+
+    const bars: { t: number; v: number }[] = [];
+    closes.forEach((c, i) => {
+        if (isNum(c) && isNum(stamps[i])) bars.push({ t: stamps[i] as number, v: c });
+    });
+    if (bars.length < 2) return null;
+
+    const first = bars[0].v;
+    const last = bars[bars.length - 1].v;
+    if (first === 0) return null;
+    const values = bars.map(b => b.v);
+    // 間引いても最後の足（現在値）は必ず残す
+    const idx = downsample(bars.map((_, i) => i), DETAIL_MAX_POINTS);
+    idx[idx.length - 1] = bars.length - 1;
+
+    return {
+        symbol,
+        range,
+        points: idx.map(i => ({ t: new Date(bars[i].t * 1000).toISOString(), v: bars[i].v })),
+        first,
+        last,
+        change: last - first,
+        changePercent: ((last - first) / first) * 100,
+        high: Math.max(...values),
+        low: Math.min(...values),
+    };
+}
