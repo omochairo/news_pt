@@ -12,6 +12,7 @@ export interface MarketDef {
     region: MarketRegion;
     decimals?: number;   // 価格の小数桁（既定 2）
     suffix?: string;
+    h24?: boolean;       // ほぼ 24 時間取引される（24 時間ビューの対象）
 }
 
 export const REGIONS: { id: MarketRegion; label: string }[] = [
@@ -26,36 +27,36 @@ export const REGIONS: { id: MarketRegion; label: string }[] = [
 
 export const MARKETS: MarketDef[] = [
     { symbol: '^N225', name: '日経平均', region: 'japan' },
-    { symbol: 'NIY=F', name: '日経先物', note: 'CME 円建て', region: 'japan', decimals: 0 },
+    { symbol: 'NIY=F', name: '日経先物', note: 'CME 円建て', region: 'japan', decimals: 0, h24: true },
     { symbol: '1306.T', name: 'TOPIX', note: '連動 ETF 1306', region: 'japan', decimals: 1 },
     { symbol: '2516.T', name: 'グロース250', note: '連動 ETF 2516', region: 'japan', decimals: 1 },
 
     { symbol: '^DJI', name: 'ダウ平均', region: 'us' },
-    { symbol: 'YM=F', name: 'ダウ先物', region: 'us', decimals: 0 },
+    { symbol: 'YM=F', name: 'ダウ先物', region: 'us', decimals: 0, h24: true },
     { symbol: '^IXIC', name: 'ナスダック', region: 'us' },
-    { symbol: 'NQ=F', name: 'ナスダック100先物', region: 'us' },
+    { symbol: 'NQ=F', name: 'ナスダック100先物', region: 'us', h24: true },
     { symbol: '^GSPC', name: 'S&P500', region: 'us' },
-    { symbol: 'ES=F', name: 'S&P500先物', region: 'us' },
+    { symbol: 'ES=F', name: 'S&P500先物', region: 'us', h24: true },
     { symbol: '^SOX', name: '半導体指数 SOX', region: 'us' },
     { symbol: '^RUT', name: 'ラッセル2000', region: 'us' },
     { symbol: '^NYFANG', name: 'FANG+', region: 'us' },
     { symbol: '^VIX', name: '恐怖指数 VIX', region: 'us' },
     { symbol: 'ACWI', name: '全世界株式', note: 'ETF ACWI', region: 'us' },
 
-    { symbol: 'JPY=X', name: 'ドル円', region: 'fx', decimals: 3 },
-    { symbol: 'EURJPY=X', name: 'ユーロ円', region: 'fx', decimals: 3 },
-    { symbol: 'GBPJPY=X', name: 'ポンド円', region: 'fx', decimals: 3 },
-    { symbol: 'AUDJPY=X', name: '豪ドル円', region: 'fx', decimals: 3 },
-    { symbol: 'EURUSD=X', name: 'ユーロドル', region: 'fx', decimals: 4 },
+    { symbol: 'JPY=X', name: 'ドル円', region: 'fx', decimals: 3, h24: true },
+    { symbol: 'EURJPY=X', name: 'ユーロ円', region: 'fx', decimals: 3, h24: true },
+    { symbol: 'GBPJPY=X', name: 'ポンド円', region: 'fx', decimals: 3, h24: true },
+    { symbol: 'AUDJPY=X', name: '豪ドル円', region: 'fx', decimals: 3, h24: true },
+    { symbol: 'EURUSD=X', name: 'ユーロドル', region: 'fx', decimals: 4, h24: true },
     { symbol: '^TNX', name: '米国債10年 利回り', region: 'fx', decimals: 3, suffix: '%' },
 
-    { symbol: 'GC=F', name: '金先物', region: 'commodities', decimals: 1 },
-    { symbol: 'SI=F', name: '銀先物', region: 'commodities', decimals: 3 },
-    { symbol: 'HG=F', name: '銅先物', region: 'commodities', decimals: 3 },
-    { symbol: 'CL=F', name: '原油 WTI', region: 'commodities' },
-    { symbol: 'NG=F', name: '天然ガス', region: 'commodities', decimals: 3 },
-    { symbol: 'BTC-JPY', name: 'ビットコイン', note: '円', region: 'commodities', decimals: 0 },
-    { symbol: 'ETH-JPY', name: 'イーサリアム', note: '円', region: 'commodities', decimals: 0 },
+    { symbol: 'GC=F', name: '金先物', region: 'commodities', decimals: 1, h24: true },
+    { symbol: 'SI=F', name: '銀先物', region: 'commodities', decimals: 3, h24: true },
+    { symbol: 'HG=F', name: '銅先物', region: 'commodities', decimals: 3, h24: true },
+    { symbol: 'CL=F', name: '原油 WTI', region: 'commodities', h24: true },
+    { symbol: 'NG=F', name: '天然ガス', region: 'commodities', decimals: 3, h24: true },
+    { symbol: 'BTC-JPY', name: 'ビットコイン', note: '円', region: 'commodities', decimals: 0, h24: true },
+    { symbol: 'ETH-JPY', name: 'イーサリアム', note: '円', region: 'commodities', decimals: 0, h24: true },
 
     { symbol: '000001.SS', name: '上海総合', region: 'asia' },
     { symbol: '^HSI', name: '香港 ハンセン', region: 'asia' },
@@ -184,4 +185,74 @@ export function formatPrice(value: number, def: Pick<MarketDef, 'decimals' | 'su
 export function formatChange(value: number, decimals: number): string {
     const text = Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     return `${value > 0 ? '+' : value < 0 ? '-' : '±'}${text}`;
+}
+
+export interface Quote24h {
+    symbol: string;
+    price: number;
+    base: number;           // 24 時間前の値
+    change: number;
+    changePercent: number;
+    high: number;
+    low: number;
+    rangePercent: number;   // 24 時間の高値と安値の差（base 比）
+    history: number[];      // 24 時間分の終値（古い順・間引き済み）
+    from: string;           // 窓の始まり・終わり（ISO）
+    to: string;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * 複数日の spark 応答から、最後の足までの 24 時間の値動きを出す。
+ * 週末で止まっている先物も「止まる直前の 24 時間」になるよう、窓の終わりは現在時刻ではなく最後の足にする。
+ */
+export function parse24h(body: unknown): Quote24h[] {
+    if (!body || typeof body !== 'object') return [];
+    const quotes: Quote24h[] = [];
+
+    for (const [symbol, raw] of Object.entries(body as Record<string, SparkEntry>)) {
+        if (!raw || typeof raw !== 'object') continue;
+        const closes = Array.isArray(raw.close) ? raw.close : [];
+        const stamps = Array.isArray(raw.timestamp) ? raw.timestamp : [];
+
+        const bars: { t: number; v: number }[] = [];
+        closes.forEach((c, i) => {
+            if (isNum(c) && isNum(stamps[i])) bars.push({ t: (stamps[i] as number) * 1000, v: c });
+        });
+        if (bars.length < 2) continue;
+
+        const last = bars[bars.length - 1];
+        const from = last.t - DAY_MS;
+        // 24 時間前ちょうどの足が無いこともあるので、それ以前で最も新しい足を起点にする
+        let startIdx = 0;
+        for (let i = 0; i < bars.length; i++) {
+            if (bars[i].t <= from) startIdx = i;
+            else break;
+        }
+        const windowBars = bars.slice(startIdx);
+        if (windowBars.length < 2) continue;
+
+        const values = windowBars.map(b => b.v);
+        const base = values[0];
+        if (base === 0) continue;
+        const high = Math.max(...values);
+        const low = Math.min(...values);
+        const change = last.v - base;
+
+        quotes.push({
+            symbol,
+            price: last.v,
+            base,
+            change,
+            changePercent: (change / base) * 100,
+            high,
+            low,
+            rangePercent: ((high - low) / base) * 100,
+            history: downsample(values, HISTORY_MAX_POINTS),
+            from: new Date(windowBars[0].t).toISOString(),
+            to: new Date(last.t).toISOString(),
+        });
+    }
+    return quotes;
 }

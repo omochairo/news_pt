@@ -7,7 +7,7 @@ const CHART_W = 100;
 const CHART_H = 40;
 
 /** 最後の足の時刻。当日（JST）なら HH:MM、別の日なら M/D */
-function formatTradeTime(iso: string | undefined, now: Date): string {
+export function formatTradeTime(iso: string | undefined, now: Date): string {
     if (!iso) return '';
     const d = new Date(iso);
     const day = (x: Date) => x.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
@@ -17,7 +17,7 @@ function formatTradeTime(iso: string | undefined, now: Date): string {
     return d.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' });
 }
 
-function IntradayChart({ history, previousClose, color }: { history: number[]; previousClose: number; color: string }) {
+export function IntradayChart({ history, previousClose, color }: { history: number[]; previousClose: number; color: string }) {
     if (history.length < 2) {
         return <div className="h-full flex items-center justify-center text-[10px] text-[var(--text-secondary)]">チャートなし</div>;
     }

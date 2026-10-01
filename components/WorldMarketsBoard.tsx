@@ -3,10 +3,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { MARKETS, MarketRegion, REGIONS, WorldQuote, getMarketStatus } from '@/lib/world-markets';
+import { usePolling } from '@/lib/use-polling';
 import MarketTile from './MarketTile';
+import Markets24hView from './Markets24hView';
 
 const REFRESH_MS = 60 * 1000;
-type Tab = 'all' | MarketRegion;
+type Tab = 'all' | MarketRegion | '24h';
 type Layout = 'normal' | 'dense';
 
 const LAYOUT_STORAGE_KEY = 'vantage-point-markets-layout';
@@ -73,27 +75,8 @@ export default function WorldMarketsBoard() {
         }
     }, []);
 
-    // 1分ごとに更新。タブが裏にある間は止め、表に戻ったらすぐ取り直す
-    useEffect(() => {
-        let timer: ReturnType<typeof setInterval> | undefined;
-        const start = () => {
-            if (timer) return;
-            load();
-            timer = setInterval(load, REFRESH_MS);
-        };
-        const stop = () => {
-            if (timer) clearInterval(timer);
-            timer = undefined;
-        };
-        const onVisibility = () => (document.hidden ? stop() : start());
-
-        if (!document.hidden) start();
-        document.addEventListener('visibilitychange', onVisibility);
-        return () => {
-            stop();
-            document.removeEventListener('visibilitychange', onVisibility);
-        };
-    }, [load]);
+    // 1分ごとに更新（タブが裏にある間は止まる）。24時間タブの間はそちらが取得するので止める
+    usePolling(load, REFRESH_MS, tab !== '24h');
 
     const sections = useMemo(
         () => REGIONS
@@ -114,36 +97,41 @@ export default function WorldMarketsBoard() {
                         <Link href="/" className="text-xs text-[var(--text-secondary)] hover:text-gray-200">← ニュースに戻る</Link>
                         <h1 className="text-2xl md:text-4xl font-bold text-gray-100 mt-1">世界の市場</h1>
                     </div>
-                    <div className="text-right font-mono">
-                        <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">LAST SYNC (JST)</div>
-                        <div className="text-lg">{updatedLabel}</div>
-                        {error && <div className="text-[10px] text-amber-400">更新に失敗しました（前回の値を表示中）</div>}
-                    </div>
+                    {/* 24時間タブは自前で取得・表示するので、ここはグリッドの更新時刻だけ出す */}
+                    {tab !== '24h' && (
+                        <div className="text-right font-mono">
+                            <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">LAST SYNC (JST)</div>
+                            <div className="text-lg">{updatedLabel}</div>
+                            {error && <div className="text-[10px] text-amber-400">更新に失敗しました（前回の値を表示中）</div>}
+                        </div>
+                    )}
                 </div>
 
-                <div className="flex items-center justify-end gap-3">
-                    <div className="flex items-center gap-1 text-[10px] text-[var(--text-secondary)]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />取引中
-                        <span className="w-1.5 h-1.5 rounded-full bg-gray-600 ml-2" />時間外
+                {tab !== '24h' && (
+                    <div className="flex items-center justify-end gap-3">
+                        <div className="flex items-center gap-1 text-[10px] text-[var(--text-secondary)]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />取引中
+                            <span className="w-1.5 h-1.5 rounded-full bg-gray-600 ml-2" />時間外
+                        </div>
+                        <div className="flex items-center rounded-lg p-0.5 bg-[var(--card-bg)] border border-[var(--card-border)] text-xs" role="group" aria-label="表示の大きさ">
+                            {LAYOUTS.map(l => (
+                                <button
+                                    key={l.id}
+                                    onClick={() => changeLayout(l.id)}
+                                    aria-pressed={layout === l.id}
+                                    className={`px-2.5 py-1 rounded-md transition-colors ${
+                                        layout === l.id ? 'bg-blue-600 text-white font-bold' : 'text-gray-400 hover:text-gray-200'
+                                    }`}
+                                >
+                                    {l.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                    <div className="flex items-center rounded-lg p-0.5 bg-[var(--card-bg)] border border-[var(--card-border)] text-xs" role="group" aria-label="表示の大きさ">
-                        {LAYOUTS.map(l => (
-                            <button
-                                key={l.id}
-                                onClick={() => changeLayout(l.id)}
-                                aria-pressed={layout === l.id}
-                                className={`px-2.5 py-1 rounded-md transition-colors ${
-                                    layout === l.id ? 'bg-blue-600 text-white font-bold' : 'text-gray-400 hover:text-gray-200'
-                                }`}
-                            >
-                                {l.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                )}
 
                 <nav className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 [scrollbar-width:none]" aria-label="地域">
-                    {[{ id: 'all' as Tab, label: 'すべて' }, ...REGIONS].map(r => (
+                    {[{ id: 'all' as Tab, label: 'すべて' }, ...REGIONS, { id: '24h' as Tab, label: '24時間' }].map(r => (
                         <button
                             key={r.id}
                             onClick={() => setTab(r.id)}
@@ -159,7 +147,9 @@ export default function WorldMarketsBoard() {
                 </nav>
             </header>
 
-            {loading && Object.keys(quotes).length === 0 ? (
+            {tab === '24h' ? (
+                <Markets24hView />
+            ) : loading && Object.keys(quotes).length === 0 ? (
                 <div className="py-20 text-center text-sm text-[var(--text-secondary)]">読み込み中...</div>
             ) : (
                 <div className="space-y-6">
