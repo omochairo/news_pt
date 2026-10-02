@@ -24,9 +24,16 @@ function sparkFor(url: string, blocked = new Set<string>()) {
     }]));
 }
 
+// 日本国債 10 年（財務省 CSV）の当月分。10 年は 11 列目
+const MOF_CSV = ['見出し', '基準日', 'R8.10.1,1,1,1,1,1,1,1,1,1,3.092', 'R8.10.2,1,1,1,1,1,1,1,1,1,3.104'].join('\r\n');
+
 function serveSpark(blocked = new Set<string>()) {
-    get.mockImplementation(async (url: string) => ({ data: sparkFor(url, blocked) }));
+    get.mockImplementation(async (url: string) => ({ data: url.includes('mof.go.jp') ? MOF_CSV : sparkFor(url, blocked) }));
 }
+
+/** Yahoo の spark への問い合わせ回数（財務省の CSV は数えない） */
+const sparkCalls = () => get.mock.calls.filter(([u]) => String(u).includes('/spark?')).length;
+const YAHOO_COUNT = MARKETS.filter(m => !m.source).length;
 
 /** ルートはモジュール内にキャッシュを持つので、テストごとに読み直す */
 async function load<T>(path: string): Promise<T> {
@@ -53,17 +60,18 @@ describe('/api/world-markets', () => {
         const body = await res.json();
         expect(res.status).toBe(200);
         expect(body.quotes).toHaveLength(MARKETS.length);
-        expect(get).toHaveBeenCalledTimes(Math.ceil(MARKETS.length / 20));
+        expect(body.quotes.find((q: { symbol: string }) => q.symbol === 'JGB10Y')).toMatchObject({ price: 3.104, previousClose: 3.092 });
+        expect(sparkCalls()).toBe(Math.ceil(YAHOO_COUNT / 20));
         expect(res.headers.get('Cache-Control')).toContain('s-maxage=60');
         await GET();
-        expect(get).toHaveBeenCalledTimes(Math.ceil(MARKETS.length / 20));
+        expect(sparkCalls()).toBe(Math.ceil(YAHOO_COUNT / 20));
     });
 
     it('同時に来たリクエストは 1 回の取得にまとめる', async () => {
         serveSpark();
         const { GET } = await load<Route>('../app/api/world-markets/route');
         await Promise.all([GET(), GET(), GET()]);
-        expect(get).toHaveBeenCalledTimes(Math.ceil(MARKETS.length / 20));
+        expect(sparkCalls()).toBe(Math.ceil(YAHOO_COUNT / 20));
     });
 
     it('1 バッチが落ちても残りを返し、取れなかった銘柄は前回値を残す', async () => {
@@ -75,6 +83,7 @@ describe('/api/world-markets', () => {
         vi.setSystemTime(new Date('2026-10-01T00:01:01Z'));
         let call = 0;
         get.mockImplementation(async (url: string) => {
+            if (url.includes('mof.go.jp')) return { data: MOF_CSV };
             if (call++ === 0) throw new Error('timeout');
             return { data: sparkFor(url) };
         });

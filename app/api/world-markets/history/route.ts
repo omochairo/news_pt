@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { HISTORY_RANGES, HistoryRange, MARKETS, QuoteHistory, parseHistory } from '@/lib/world-markets';
+import { JGB10Y_SYMBOL } from '@/lib/jgb';
+import { getJgbHistory } from '@/lib/jgb-cache';
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const KNOWN = new Set(MARKETS.map(m => m.symbol));
@@ -17,6 +19,8 @@ const cache = new Map<string, { data: QuoteHistory; timestamp: number }>();
 const inflight = new Map<string, Promise<QuoteHistory | null>>();
 
 async function fetchHistory(symbol: string, range: HistoryRange): Promise<QuoteHistory | null> {
+    // 日本国債 10 年は Yahoo に無いので、財務省の日次 CSV から作る
+    if (symbol === JGB10Y_SYMBOL) return getJgbHistory(range);
     const interval = HISTORY_RANGES.find(r => r.id === range)!.interval;
     const url = `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${encodeURIComponent(symbol)}&range=${range}&interval=${interval}`;
     const res = await axios.get(url, { headers: { 'User-Agent': USER_AGENT }, timeout: 6000 });

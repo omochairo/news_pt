@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { MARKETS, Quote24h, WorldQuote, parse24h, parseSparkResponse } from './world-markets';
 import { QuotesSnapshot, createQuoteCache, fetchInBatches } from './quote-cache';
+import { getJgbQuote } from './jgb-cache';
 
 /**
  * /api/world-markets と /api/market（ニュース画面のティッカー）が共有する取得とキャッシュ。
@@ -13,12 +14,21 @@ const BATCH_SIZE = 20;
 
 export type WorldQuotesSnapshot = QuotesSnapshot<WorldQuote>;
 
+const YAHOO_SYMBOLS = MARKETS.filter(m => !m.source).map(m => m.symbol);
+
 const worldCache = createQuoteCache<WorldQuote>(
-    () => fetchInBatches(MARKETS.map(m => m.symbol), BATCH_SIZE, async symbols => {
-        const url = `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${symbols.map(encodeURIComponent).join(',')}&range=1d&interval=5m`;
-        const res = await axios.get(url, { headers: { 'User-Agent': USER_AGENT }, timeout: 5000 });
-        return parseSparkResponse(res.data);
-    }, 'World markets'),
+    async () => {
+        // Yahoo の spark と、日本国債 10 年（財務省 CSV、自前で長めにキャッシュ）を並べて取る
+        const [yahoo, jgb] = await Promise.all([
+            fetchInBatches(YAHOO_SYMBOLS, BATCH_SIZE, async symbols => {
+                const url = `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${symbols.map(encodeURIComponent).join(',')}&range=1d&interval=5m`;
+                const res = await axios.get(url, { headers: { 'User-Agent': USER_AGENT }, timeout: 5000 });
+                return parseSparkResponse(res.data);
+            }, 'World markets'),
+            getJgbQuote().catch(() => null),
+        ]);
+        return jgb ? [...yahoo, jgb] : yahoo;
+    },
     'World markets',
 );
 

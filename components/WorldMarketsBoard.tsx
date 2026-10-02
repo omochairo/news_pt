@@ -212,6 +212,7 @@ export default function WorldMarketsBoard() {
             <p className="mt-8 text-[10px] text-[var(--text-secondary)] leading-relaxed">
                 データは Yahoo Finance から取得しています。指数は 15〜20 分程度遅れることがあります。点線は前日終値。☆ で選んだ銘柄は「すべて」の先頭に出ます（この端末にだけ保存）。タイルを押すと 5 日・1 か月・1 年のチャートが開きます。
                 TOPIX・グロース250 は連動 ETF、全世界株式は ETF ACWI の値です。
+                日本国債10年利回りは財務省「国債金利情報」（日次の終値）を加工して作成しています（前営業日の値。点線は前々営業日）。
             </p>
         </main>
     );

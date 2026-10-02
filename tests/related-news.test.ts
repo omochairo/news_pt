@@ -26,6 +26,9 @@ describe('detectRelatedMarkets', () => {
         expect(detectRelatedMarkets('日経平均終値2203円高　6万8956円')).toEqual(['^N225', 'NIY=F']);
         expect(detectRelatedMarkets('東京株式（大引け）＝２２０３円高')).toEqual(['^N225', 'NIY=F']);
         expect(detectRelatedMarkets('外為14時　円高が進む')).toEqual(['JPY=X']);
+        // 「ハードル高い」は「ドル高」ではない
+        expect(detectRelatedMarkets('利下げのハードル高い')).toEqual([]);
+        expect(detectRelatedMarkets('ドル高が一服')).toEqual(['JPY=X']);
     });
 
     it('全角英字の指数名も拾う', () => {
