@@ -8,6 +8,7 @@ import { readFavorites, saveFavorites, toggleFavorite } from '@/lib/favorites';
 import MarketTile from './MarketTile';
 import Markets24hView from './Markets24hView';
 import MarketDetailDialog from './MarketDetailDialog';
+import { MoveAlertsToggle } from './MoveAlerts';
 
 const REFRESH_MS = 60 * 1000;
 type Tab = 'all' | MarketRegion | '24h';
@@ -113,14 +114,17 @@ export default function WorldMarketsBoard() {
                         <Link href="/" className="text-xs text-[var(--text-secondary)] hover:text-gray-200">← ニュースに戻る</Link>
                         <h1 className="text-2xl md:text-4xl font-bold text-gray-100 mt-1">世界の市場</h1>
                     </div>
-                    {/* 24時間タブは自前で取得・表示するので、ここはグリッドの更新時刻だけ出す */}
-                    {tab !== '24h' && (
-                        <div className="text-right font-mono">
-                            <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">LAST SYNC (JST)</div>
-                            <div className="text-lg">{updatedLabel}</div>
-                            {error && <div className="text-[10px] text-amber-400">更新に失敗しました（前回の値を表示中）</div>}
-                        </div>
-                    )}
+                    <div className="flex items-end gap-3">
+                        <MoveAlertsToggle />
+                        {/* 24時間タブは自前で取得・表示するので、ここはグリッドの更新時刻だけ出す */}
+                        {tab !== '24h' && (
+                            <div className="text-right font-mono">
+                                <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">LAST SYNC (JST)</div>
+                                <div className="text-lg">{updatedLabel}</div>
+                                {error && <div className="text-[10px] text-amber-400">更新に失敗しました（前回の値を表示中）</div>}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {tab !== '24h' && (

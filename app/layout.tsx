@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { MoveAlertsWatcher } from "@/components/MoveAlerts";
 
 const inter = Inter({ subsets: ["latin"] });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: '--font-mono' });
@@ -33,6 +34,7 @@ export default function RootLayout({
         <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
           {children}
         </div>
+        <MoveAlertsWatcher />
       </body>
     </html>
   );
