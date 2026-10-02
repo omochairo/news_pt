@@ -6,13 +6,14 @@
 export type MarketRegion = 'japan' | 'us' | 'fx' | 'commodities' | 'asia' | 'europe' | 'americas';
 
 export interface MarketDef {
-    symbol: string;      // Yahoo Finance のシンボル
+    symbol: string;      // Yahoo Finance のシンボル（source があるときはこのアプリ内の識別子）
     name: string;
     note?: string;       // 代替銘柄であることなどの補足
     region: MarketRegion;
     decimals?: number;   // 価格の小数桁（既定 2）
     suffix?: string;
     h24?: boolean;       // ほぼ 24 時間取引される（24 時間ビューの対象）
+    source?: 'mof';      // Yahoo 以外から取る（mof = 財務省の国債金利 CSV。日次）
 }
 
 export const REGIONS: { id: MarketRegion; label: string }[] = [
@@ -49,6 +50,7 @@ export const MARKETS: MarketDef[] = [
     { symbol: 'AUDJPY=X', name: '豪ドル円', region: 'fx', decimals: 3, h24: true },
     { symbol: 'EURUSD=X', name: 'ユーロドル', region: 'fx', decimals: 4, h24: true },
     { symbol: '^TNX', name: '米国債10年 利回り', region: 'fx', decimals: 3, suffix: '%' },
+    { symbol: 'JGB10Y', name: '日本国債10年 利回り', note: '財務省・日次', region: 'fx', decimals: 3, suffix: '%', source: 'mof' },
 
     { symbol: 'GC=F', name: '金先物', region: 'commodities', decimals: 1, h24: true },
     { symbol: 'SI=F', name: '銀先物', region: 'commodities', decimals: 3, h24: true },

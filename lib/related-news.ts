@@ -6,6 +6,8 @@
 interface RelatedRule {
     pattern: RegExp;
     symbols: string[];
+    /** 当てはまっても、見出しにこれがあれば外す（他国の話のとき） */
+    unless?: RegExp;
 }
 
 // 単語の境界が要る英字は \b で囲む（「GOLD」が「Goldman」に当たらないように）
@@ -23,12 +25,16 @@ const RULES: RelatedRule[] = [
     { pattern: /\bVIX\b|恐怖指数/i, symbols: ['^VIX'] },
     // 為替・金利
     // 「2203円高」は株価の値幅なので、数字の直後の「円高・円安」は除く
-    { pattern: /(?<![\d０-９万千百])円[安高]|円相場|ドル円|ドル高|ドル安|為替介入|\byen\b|USD\/?JPY/i, symbols: ['JPY=X'] },
+    // 「ハードル高い」の「ドル高」に当てないよう、長音の直後の「ドル」は除く
+    { pattern: /(?<![\d０-９万千百])円[安高]|円相場|ドル円|(?<!ー)ドル[高安]|為替介入|\byen\b|USD\/?JPY/i, symbols: ['JPY=X'] },
     { pattern: /ユーロ円|EUR\/?JPY/i, symbols: ['EURJPY=X'] },
     { pattern: /ユーロドル|ユーロ高|ユーロ安|EUR\/?USD|\beuro\b/i, symbols: ['EURUSD=X'] },
     { pattern: /ポンド|\bsterling\b|\bGBP\b/i, symbols: ['GBPJPY=X'] },
     { pattern: /豪ドル|\bAUD\b/, symbols: ['AUDJPY=X'] },
-    { pattern: /米国債|米国債利回り|米長期金利|10年債|\bTreasur(y|ies)\b/i, symbols: ['^TNX'] },
+    { pattern: /米国債|米10年債|米長期金利|\bTreasur(y|ies)\b/i, symbols: ['^TNX'] },
+    { pattern: /日本国債|円債|国債先物|\bJGB/i, symbols: ['JGB10Y'] },
+    // 「長期金利」「10年債」だけでは国が分からないので、他国の名前が無い見出しに限って日本の国債とみなす
+    { pattern: /長期金利|10年債/, symbols: ['JGB10Y'], unless: /米|ドイツ|独|英|欧州|ユーロ|仏|伊|豪|中国|NY|FRB|ECB/ },
     // 商品・暗号資産
     { pattern: /金価格|金相場|金先物|\bgold\b/i, symbols: ['GC=F'] },
     { pattern: /銀価格|銀相場|銀先物|\bsilver\b/i, symbols: ['SI=F'] },
@@ -56,7 +62,7 @@ export const RELATED_SYMBOLS = new Set(RULES.flatMap(r => r.symbols));
 export function detectRelatedMarkets(title: string): string[] {
     const found = new Set<string>();
     for (const rule of RULES) {
-        if (rule.pattern.test(title)) rule.symbols.forEach(s => found.add(s));
+        if (rule.pattern.test(title) && !rule.unless?.test(title)) rule.symbols.forEach(s => found.add(s));
     }
     return [...found];
 }
