@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     // 手元の調査用スクリプト（アプリ本体からは読み込まない）
     "scripts/**",
     "test-gf.js",
+    // npm run test:coverage が出す HTML レポート
+    "coverage/**",
   ]),
 ]);
 
