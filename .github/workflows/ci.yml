@@ -25,7 +25,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      # カバレッジの下限は vitest.config.mts の thresholds
+      - run: npm run test:coverage
       - run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: 1
