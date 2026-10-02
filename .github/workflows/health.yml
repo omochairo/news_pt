@@ -1,0 +1,33 @@
+name: Health
+
+# 本番の /api/health を定期的に叩き、相場・ニュースの取得が止まっていたら失敗させる。
+# 失敗すると GitHub から通知が届く（issue は起票しない）。
+# 取得は Netlify 側で走るので、Netlify の送信元が取得元に遮断されたときにも気づける。
+on:
+  schedule:
+    - cron: '17 */6 * * *' # 6 時間ごと（通知が続けて届きすぎないよう間を空ける）
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      HEALTH_URL: https://jpnnews.netlify.app/api/health
+    steps:
+      - name: Check /api/health
+        run: |
+          # コールドスタートや一時的な失敗で落ちないよう、少し間を置いて 3 回まで試す
+          for attempt in 1 2 3; do
+            # 接続できなかったときも curl は %{http_code} に 000 を出す
+            status=$(curl -sS --max-time 60 -o body.json -w '%{http_code}' "$HEALTH_URL" || true)
+            echo "attempt $attempt: HTTP $status"
+            cat body.json 2>/dev/null || true
+            echo
+            if [ "$status" = "200" ]; then exit 0; fi
+            if [ "$attempt" -lt 3 ]; then sleep 90; fi
+          done
+          echo "::error::/api/health が 200 を返さなかった（最後の応答: HTTP $status）"
+          exit 1
