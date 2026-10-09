@@ -5,13 +5,18 @@ import { SymbolMarketData } from './market-data';
 
 const MARKET_REFRESH_MS = 60 * 1000;
 
-const MarketDataContext = createContext<SymbolMarketData[]>([]);
+interface MarketDataValue {
+    ticker: SymbolMarketData[];
+    related: SymbolMarketData[];
+}
+
+const MarketDataContext = createContext<MarketDataValue>({ ticker: [], related: [] });
 
 /**
- * /api/market を1分ごとに取得し、ティッカーと各記事の Sparkline に同じデータを配る
+ * /api/market を1分ごとに取得し、ティッカーと各記事の Sparkline に配る
  */
 export function MarketDataProvider({ children }: { children: React.ReactNode }) {
-    const [data, setData] = useState<SymbolMarketData[]>([]);
+    const [data, setData] = useState<MarketDataValue>({ ticker: [], related: [] });
 
     useEffect(() => {
         let cancelled = false;
@@ -21,7 +26,9 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
                 const res = await fetch('/api/market', { cache: 'no-store' });
                 if (!res.ok) throw new Error('Market API failed');
                 const json = await res.json();
-                if (!cancelled && Array.isArray(json.data)) setData(json.data);
+                if (!cancelled && Array.isArray(json.data)) {
+                    setData({ ticker: json.data, related: Array.isArray(json.related) ? json.related : [] });
+                }
             } catch (e) {
                 console.error('Market data error:', e);
             }
@@ -39,12 +46,11 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
 }
 
 export function useMarketData(): SymbolMarketData[] {
-    return useContext(MarketDataContext);
+    return useContext(MarketDataContext).ticker;
 }
 
-/** 銘柄名で1件引く。未取得・取得失敗なら null */
-export function useMarketQuote(name: string): SymbolMarketData | null {
-    const data = useMarketData();
-    const quote = data.find(d => d.name === name);
-    return quote && quote.price !== '--' ? quote : null;
+/** 記事の下のチャート用に、world-markets の symbol で1件引く。未取得・取得失敗なら null */
+export function useRelatedQuote(symbol: string): SymbolMarketData | null {
+    const { related } = useContext(MarketDataContext);
+    return related.find(d => d.symbol === symbol) ?? null;
 }

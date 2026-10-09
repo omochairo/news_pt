@@ -5,7 +5,7 @@ import { NewsItem, NewsSource } from '@/lib/parser';
 import { SOURCES } from '@/lib/sources';
 import { scoreImportance, IMPORTANCE_CONFIGS } from '@/lib/importance';
 import { categorizeArticle, getCategoryConfig } from '@/lib/categorizer';
-import { detectRelatedSymbol } from '@/lib/market-data';
+import { detectPrimaryMarket } from '@/lib/related-news';
 import { checkPaywall } from '@/lib/paywall';
 import Sparkline from './Sparkline';
 
@@ -96,7 +96,7 @@ export default function TopStory({ item, onBookmark, isBookmarked, isRead, onMar
 
                     {/* Sparkline */}
                     {(() => {
-                        const symbolData = detectRelatedSymbol(item.title);
+                        const symbolData = detectPrimaryMarket(item.title);
                         if (!symbolData) return null;
                         return <Sparkline symbol={symbolData} />;
                     })()}

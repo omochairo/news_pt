@@ -1,4 +1,5 @@
-import type { WorldQuote } from './world-markets';
+import { MARKETS, WorldQuote, formatChange, formatPrice } from './world-markets';
+import { RELATED_SYMBOLS } from './related-news';
 
 /** /api/market が返す1銘柄分のデータ */
 export interface SymbolMarketData {
@@ -10,9 +11,6 @@ export interface SymbolMarketData {
     direction: 'up' | 'down' | 'flat';
     history: number[]; // Sparkline 用のイントラデイ終値（古い順）
 }
-
-/** ニュース見出しと紐づける銘柄（/api/market の name と一致させる） */
-export type RelatedSymbol = 'USD/JPY' | 'EUR/JPY' | '日経225' | 'S&P 500' | 'BTC/JPY' | '原油WTI';
 
 /**
  * ニュース画面のティッカーに出す銘柄。値は /api/world-markets と同じ取得・キャッシュから出す
@@ -65,30 +63,20 @@ export function toTickerData(quotes: Record<string, WorldQuote>): SymbolMarketDa
 }
 
 /**
- * ニュースのタイトルから関連する市場シンボルを検出する
+ * 記事の下のチャート用。見出しと紐づく銘柄（related-news.ts の RELATED_SYMBOLS）を、
+ * /markets と同じ名前・桁で直す。取れていない銘柄は返さない
  */
-export function detectRelatedSymbol(title: string): RelatedSymbol | null {
-    // 暗号資産の記事は「3億ドル」など金額表記でドルを含みやすいので、為替より先に判定する
-    if (/ビットコイン|暗号資産|仮想通貨|Bitcoin|BTC|イーサリアム/i.test(title)) {
-        return 'BTC/JPY';
-    }
-    // 「ドル」単体は金額表記に当たるので、為替の文脈を表す語に限る
-    // 「1000円高」は株価の値幅、「ハードル高い」は為替ではないので除く（related-news.ts と同じ）
-    if (/(?<![\d０-９万千百])円[安高]|円相場|為替|ドル円|(?<!ー)ドル[高安]|介入|\byen\b|USD\/?JPY/i.test(title)) {
-        return 'USD/JPY';
-    }
-    if (/ユーロ円|ユーロ高|ユーロ安|EUR\/?JPY/i.test(title)) {
-        return 'EUR/JPY';
-    }
-    if (/日経|TOPIX|東証|日本株|株価|日経平均|nikkei/i.test(title)) {
-        return '日経225';
-    }
-    if (/S&P|ダウ|ナスダック|NASDAQ|米株|米国株|エヌビディア|アップル|テスラ/i.test(title)) {
-        return 'S&P 500';
-    }
-    if (/原油|石油|WTI|Brent|OPEC|ガソリン/i.test(title)) {
-        return '原油WTI';
-    }
-
-    return null;
+export function toRelatedData(quotes: Record<string, WorldQuote>): SymbolMarketData[] {
+    return MARKETS.filter(def => RELATED_SYMBOLS.has(def.symbol) && quotes[def.symbol]?.price > 0).map(def => {
+        const q = quotes[def.symbol];
+        return {
+            symbol: def.symbol,
+            name: def.name,
+            price: formatPrice(q.price, def),
+            change: formatChange(q.change, def.decimals ?? 2),
+            changePercent: `${formatChange(q.changePercent, 2)}%`,
+            direction: q.change > 0 ? 'up' : q.change < 0 ? 'down' : 'flat',
+            history: q.history,
+        };
+    });
 }

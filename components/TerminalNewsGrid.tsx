@@ -5,7 +5,7 @@ import { NewsItem } from '@/lib/parser';
 import { SOURCE_BY_NAME } from '@/lib/sources';
 import { scoreImportance } from '@/lib/importance';
 import { categorizeArticle, getCategoryConfig } from '@/lib/categorizer';
-import { detectRelatedSymbol } from '@/lib/market-data';
+import { detectPrimaryMarket } from '@/lib/related-news';
 import { checkPaywall } from '@/lib/paywall';
 import Sparkline from './Sparkline';
 
@@ -54,7 +54,7 @@ export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls, re
                             const importance = scoreImportance(item.title);
                             const category = categorizeArticle(item.title);
                             const catConfig = getCategoryConfig(category);
-                            const marketSymbol = detectRelatedSymbol(item.title);
+                            const marketSymbol = detectPrimaryMarket(item.title);
                             const isBm = bookmarkedUrls?.has(item.url);
                             const isRead = readUrls?.has(item.url);
 

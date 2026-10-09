@@ -6,6 +6,7 @@ import MarketTile from '../components/MarketTile';
 import Markets24hView from '../components/Markets24hView';
 import { MARKETS, Quote24h, QuoteHistory, WorldQuote } from '../lib/world-markets';
 import { FAVORITES_STORAGE_KEY } from '../lib/favorites';
+import { RELATED_SYMBOLS } from '../lib/related-news';
 
 const NOW = new Date('2026-10-01T03:00:00Z');
 
@@ -203,19 +204,15 @@ describe('WorldMarketsBoard', () => {
         await within(dialog).findByText(/5日で/);
     });
 
-    it('関連ニュースの対応が無い銘柄では欄を出さず、ニュースが取れなければその旨を出す', async () => {
+    it('すべての銘柄に関連ニュースの欄を出し、ニュースが取れなければその旨を出す', async () => {
+        expect(MARKETS.filter(m => !RELATED_SYMBOLS.has(m.symbol)).map(m => m.name)).toEqual([]);
         routes['/api/news'] = () => new Response('', { status: 500 });
         // 前のテストで取ったニュースのキャッシュ（5 分）を切らす
         vi.setSystemTime(new Date(NOW.getTime() + 6 * 60_000));
         render(<WorldMarketsBoard />);
         await screen.findByRole('heading', { name: /米国/ });
-        fireEvent.click(tile('FANG+'));
-        let dialog = await screen.findByRole('dialog', { hidden: true });
-        await within(dialog).findByText(/5日で/);
-        expect(within(dialog).queryByText('関連ニュース')).toBeNull();
-        fireEvent.click(within(dialog).getByRole('button', { name: '閉じる', hidden: true }));
         fireEvent.click(tile('原油 WTI'));
-        dialog = await screen.findByRole('dialog', { hidden: true });
+        const dialog = await screen.findByRole('dialog', { hidden: true });
         await within(dialog).findByText('ニュースを取得できませんでした');
     });
 });
