@@ -21,6 +21,7 @@ import EconomicCalendar from '@/components/EconomicCalendar';
 import PWAInstallPrompt from '@/components/PWAInstallPrompt';
 import { saveToDailyHistory, getDailyHistory, DailyHistory } from '@/lib/history';
 import { compareByDateDesc } from '@/lib/feed';
+import { checkPaywall } from '@/lib/paywall';
 
 interface NewsData {
     nikkei?: NewsItem[];
@@ -35,6 +36,7 @@ interface NewsData {
 type ViewMode = 'modern' | 'terminal' | 'split';
 const VIEWMODE_STORAGE_KEY = 'vantage-point-viewmode';
 const UNREAD_ONLY_STORAGE_KEY = 'vantage-point-unread-only';
+const HIDE_PAYWALL_STORAGE_KEY = 'vantage-point-hide-paywall';
 const NEWS_REFRESH_MS = 5 * 60 * 1000;
 // タブ・アプリに戻ってきたとき、これより古ければ取り直す
 const STALE_ON_RETURN_MS = 60 * 1000;
@@ -54,6 +56,7 @@ export default function Home() {
     const [activeSources, setActiveSources] = useState<Set<NewsSource>>(new Set(ALL_SOURCES));
     const [viewMode, setViewMode] = useState<ViewMode>('modern');
     const [unreadOnly, setUnreadOnly] = useState(false);
+    const [hidePaywall, setHidePaywall] = useState(false);
     const [showScrollTop, setShowScrollTop] = useState(false);
     const lastFetchRef = useRef(0);
 
@@ -69,6 +72,7 @@ export default function Home() {
         }
         try {
             setUnreadOnly(localStorage.getItem(UNREAD_ONLY_STORAGE_KEY) === '1');
+            setHidePaywall(localStorage.getItem(HIDE_PAYWALL_STORAGE_KEY) === '1');
         } catch {
             // localStorage が使えない環境では既定値のまま
         }
@@ -78,6 +82,17 @@ export default function Home() {
         setUnreadOnly(prev => {
             try {
                 localStorage.setItem(UNREAD_ONLY_STORAGE_KEY, prev ? '0' : '1');
+            } catch {
+                // 保存できなくても表示の切り替えは効かせる
+            }
+            return !prev;
+        });
+    };
+
+    const toggleHidePaywall = () => {
+        setHidePaywall(prev => {
+            try {
+                localStorage.setItem(HIDE_PAYWALL_STORAGE_KEY, prev ? '0' : '1');
             } catch {
                 // 保存できなくても表示の切り替えは効かせる
             }
@@ -181,34 +196,45 @@ export default function Home() {
         return filtered;
     }, [searchQuery, activeCategory, unreadOnly, readUrls]);
 
+    // 有料記事を隠す設定のときは、どの表示モードにも出さない（件数・トレンド語も含めて）
+    const shownData = useMemo(() => {
+        if (!data || !hidePaywall) return data;
+        const free = (items?: NewsItem[]) => items?.filter(item => !checkPaywall(item).isPaywall);
+        return {
+            ...data,
+            nikkei: free(data.nikkei), minkabu: free(data.minkabu), bloomberg: free(data.bloomberg),
+            reuters: free(data.reuters), cnn: free(data.cnn), crypto: free(data.crypto),
+        };
+    }, [data, hidePaywall]);
+
     // 全ソースを統合して時間順にソート（タイムライン）
     const timelineItems = useMemo(() => {
-        if (!data) return [];
+        if (!shownData) return [];
         const all: NewsItem[] = [];
-        if (activeSources.has('Nikkei')) all.push(...(data.nikkei || []));
-        if (activeSources.has('MinkabuFX')) all.push(...(data.minkabu || []));
-        if (activeSources.has('Crypto')) all.push(...(data.crypto || []));
-        if (activeSources.has('Bloomberg')) all.push(...(data.bloomberg || []));
-        if (activeSources.has('Reuters')) all.push(...(data.reuters || []));
-        if (activeSources.has('CNN')) all.push(...(data.cnn || []));
+        if (activeSources.has('Nikkei')) all.push(...(shownData.nikkei || []));
+        if (activeSources.has('MinkabuFX')) all.push(...(shownData.minkabu || []));
+        if (activeSources.has('Crypto')) all.push(...(shownData.crypto || []));
+        if (activeSources.has('Bloomberg')) all.push(...(shownData.bloomberg || []));
+        if (activeSources.has('Reuters')) all.push(...(shownData.reuters || []));
+        if (activeSources.has('CNN')) all.push(...(shownData.cnn || []));
 
         const filtered = filterItems(all);
 
         return filtered.sort(compareByDateDesc);
-    }, [data, activeSources, filterItems]);
+    }, [shownData, activeSources, filterItems]);
 
     // 全アイテム一覧（トレンド抽出用）
     const allRawItems = useMemo(() => {
-        if (!data) return [];
+        if (!shownData) return [];
         return [
-            ...(data.nikkei || []),
-            ...(data.minkabu || []),
-            ...(data.crypto || []),
-            ...(data.bloomberg || []),
-            ...(data.reuters || []),
-            ...(data.cnn || []),
+            ...(shownData.nikkei || []),
+            ...(shownData.minkabu || []),
+            ...(shownData.crypto || []),
+            ...(shownData.bloomberg || []),
+            ...(shownData.reuters || []),
+            ...(shownData.cnn || []),
         ];
-    }, [data]);
+    }, [shownData]);
 
     // トレンドキーワード抽出
     const trendKeywords: TrendKeyword[] = useMemo(() => {
@@ -218,13 +244,13 @@ export default function Home() {
     // カテゴリごとのカウント
     const categoryCounts = useMemo(() => {
         const allRaw: NewsItem[] = [];
-        if (data) {
-            if (activeSources.has('Nikkei')) allRaw.push(...(data.nikkei || []));
-            if (activeSources.has('MinkabuFX')) allRaw.push(...(data.minkabu || []));
-            if (activeSources.has('Crypto')) allRaw.push(...(data.crypto || []));
-            if (activeSources.has('Bloomberg')) allRaw.push(...(data.bloomberg || []));
-            if (activeSources.has('Reuters')) allRaw.push(...(data.reuters || []));
-            if (activeSources.has('CNN')) allRaw.push(...(data.cnn || []));
+        if (shownData) {
+            if (activeSources.has('Nikkei')) allRaw.push(...(shownData.nikkei || []));
+            if (activeSources.has('MinkabuFX')) allRaw.push(...(shownData.minkabu || []));
+            if (activeSources.has('Crypto')) allRaw.push(...(shownData.crypto || []));
+            if (activeSources.has('Bloomberg')) allRaw.push(...(shownData.bloomberg || []));
+            if (activeSources.has('Reuters')) allRaw.push(...(shownData.reuters || []));
+            if (activeSources.has('CNN')) allRaw.push(...(shownData.cnn || []));
         }
         const counts: Record<NewsCategory, number> = {
             all: allRaw.length,
@@ -235,7 +261,7 @@ export default function Home() {
             if (cat !== 'all') counts[cat]++;
         });
         return counts;
-    }, [data, activeSources]);
+    }, [shownData, activeSources]);
 
     // トップストーリー
     const topStory = timelineItems[0] || null;
@@ -414,6 +440,18 @@ export default function Home() {
                                 >
                                     {unreadOnly ? '✓ 未読のみ' : '未読のみ'}
                                 </button>
+                                <button
+                                    onClick={toggleHidePaywall}
+                                    aria-pressed={!hidePaywall}
+                                    className={`flex-shrink-0 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors whitespace-nowrap ${
+                                        hidePaywall
+                                            ? 'bg-[var(--card-bg)] text-gray-400 border-[var(--card-border)] hover:text-gray-200 line-through'
+                                            : 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                                    }`}
+                                    title={hidePaywall ? '有料記事を表示する' : '有料記事を隠す'}
+                                >
+                                    {hidePaywall ? '🔒 有料 OFF' : '🔒 有料 ON'}
+                                </button>
                                 </div>
 
                                 {/* Trend Keywords Cloud */}
@@ -462,7 +500,7 @@ export default function Home() {
                 ) : viewMode === 'split' ? (
                     /* DUAL PANEL SPLIT VIEW MODE */
                     <SplitViewFeed
-                        data={data}
+                        data={shownData}
                         onBookmark={handleBookmark}
                         bookmarkedUrls={bookmarkedUrls}
                         readUrls={readUrls}
