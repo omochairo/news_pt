@@ -144,6 +144,14 @@ describe('ニュース画面', () => {
         fireEvent.click(document.querySelector('.bookmark-overlay')!);
     });
 
+    it('LAST SYNC は受け取った時刻でなくサーバーの取得時刻、更新ボタンはキャッシュを通さず取り直させる', async () => {
+        newsBody.updatedAt = '2026-10-01T02:55:00.000Z';
+        await renderHome();
+        expect(screen.getByText('11:55:00')).toBeTruthy();
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'ニュースを更新' })); });
+        expect(fetchMock).toHaveBeenCalledWith('/api/news?refresh=true', { cache: 'no-store' });
+    });
+
     it('更新ボタンで取り直し、失敗しても落ちない', async () => {
         await renderHome();
         const calls = fetchMock.mock.calls.filter(([u]) => String(u).startsWith('/api/news')).length;

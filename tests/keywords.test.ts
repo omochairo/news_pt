@@ -46,4 +46,11 @@ describe('分類・重要度・関連銘柄', () => {
         expect(detectRelatedSymbol('OPECが減産')).toBe('原油WTI');
         expect(detectRelatedSymbol('新型スマートフォンを発表')).toBeNull();
     });
+
+    it('detectRelatedSymbol: 株価の値幅の「円高」や「ハードル高い」を為替にしない', () => {
+        expect(detectRelatedSymbol('日経平均、一時1000円高')).toBe('日経225');
+        expect(detectRelatedSymbol('日本株が反発、５００円高')).toBe('日経225');
+        expect(detectRelatedSymbol('利上げのハードル高い')).toBeNull();
+        expect(detectRelatedSymbol('円高が進み、日経平均は反落')).toBe('USD/JPY');
+    });
 });

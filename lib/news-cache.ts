@@ -52,6 +52,32 @@ async function fetchAllNews(): Promise<NewsData> {
     };
 }
 
+export type NewsSource = (typeof NEWS_SOURCES)[number];
+
+// 媒体ごとに、0 件が続いている最初の時刻（取れたら消す）。/api/health が長く続く停止を見つけるのに使う
+let emptySince: Partial<Record<NewsSource, string>> = {};
+
+/**
+ * 0 件だった媒体は前回の記事を残す（一時的な失敗で画面から媒体ごと消えないように）。
+ * 残したかどうかに関わらず、0 件になった時刻は emptySince に記録する
+ */
+function keepPreviousOnEmpty(fresh: NewsData, now: number): NewsData {
+    const merged = { ...fresh };
+    const next: typeof emptySince = {};
+    for (const source of NEWS_SOURCES) {
+        if (fresh[source].length > 0) continue;
+        next[source] = emptySince[source] ?? new Date(now).toISOString();
+        const previous = memoryCache?.data[source];
+        if (previous && previous.length > 0) merged[source] = previous;
+    }
+    emptySince = next;
+    return merged;
+}
+
+export function getNewsEmptySince(): Partial<Record<NewsSource, string>> {
+    return emptySince;
+}
+
 export type NewsResult =
     | { data: NewsData; cache: 'HIT' | 'MISS' | 'STALE-FALLBACK' }
     | null;
@@ -69,7 +95,7 @@ export async function getNews(requestRefresh = false): Promise<NewsResult> {
 
     try {
         if (!inflight) {
-            inflight = fetchAllNews().finally(() => { inflight = null; });
+            inflight = fetchAllNews().then(fresh => keepPreviousOnEmpty(fresh, now)).finally(() => { inflight = null; });
         }
         const result = await inflight;
         memoryCache = { data: result, timestamp: now };
