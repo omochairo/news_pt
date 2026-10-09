@@ -16,6 +16,11 @@ const PAYWALL_KEYWORDS = [
 export function checkPaywall(item: NewsItem): PaywallInfo {
     const { source, title, url } = item;
 
+    // 0. 取得時に記事ページで有料と確かめた記事（東洋経済など、見出しに印が無い媒体）
+    if (item.paywall) {
+        return { isPaywall: true, label: '🔒 有料会員限定' };
+    }
+
     // 1. Bloomberg 記事は全件原則有料（閲覧制限あり）
     if (source === 'Bloomberg') {
         return { isPaywall: true, label: '🔒 有料記事' };
