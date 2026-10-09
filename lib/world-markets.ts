@@ -59,6 +59,8 @@ export const MARKETS: MarketDef[] = [
     { symbol: 'NG=F', name: '天然ガス', region: 'commodities', decimals: 3, h24: true },
     { symbol: 'BTC-JPY', name: 'ビットコイン', note: '円', region: 'commodities', decimals: 0, h24: true },
     { symbol: 'ETH-JPY', name: 'イーサリアム', note: '円', region: 'commodities', decimals: 0, h24: true },
+    { symbol: 'XRP-JPY', name: 'XRP', note: '円', region: 'commodities', h24: true },
+    { symbol: 'SOL-JPY', name: 'ソラナ', note: '円', region: 'commodities', decimals: 0, h24: true },
 
     { symbol: '000001.SS', name: '上海総合', region: 'asia' },
     { symbol: '^HSI', name: '香港 ハンセン', region: 'asia' },
@@ -161,6 +163,10 @@ export function parseSparkResponse(body: unknown): WorldQuote[] {
         // その間は直前の取引日の終値（fulldayPrice）で出し、チャートは空にする
         const price = points.at(-1) ?? (isNum(raw.fulldayPrice) ? raw.fulldayPrice : undefined);
         if (price === undefined || previousClose === undefined || previousClose === 0) continue;
+        // Yahoo が前日終値を壊れた値で返すことがある（上海総合で 3813 に対して 0.0002）。
+        // 1 日で半分や倍になることはまず無いので、その範囲を外れたら取れなかったものとして扱う
+        const ratio = price / previousClose;
+        if (!(ratio > 0.5 && ratio < 2)) continue;
 
         const change = price - previousClose;
         quotes.push({
