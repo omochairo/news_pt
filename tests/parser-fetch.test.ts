@@ -11,6 +11,8 @@ import {
     fetchToyoKeizaiNews,
     fetchTradersWebNews,
     fetchZaiFXNews,
+    inspectDiamondPage,
+    isNotFreeByJsonLd,
     fetchCryptoNews,
     fetchMinkabuFXNews,
     fetchNikkeiNews,
@@ -153,11 +155,90 @@ describe('追加した媒体', () => {
         expect(items[0].source).toBe('ToyoKeizai');
     });
 
-    it('ダイヤモンド: 市況の語で絞った Google News 検索で取り、ザイFX！を除く', async () => {
-        respond(() => rss([{ title: '絶好調ハイテク株もむしばむ金利上昇 - ダイヤモンド・オンライン', link: 'https://diamond.jp/a' }]));
+    it('東洋経済: 記事ページの isAccessibleForFree が false なら有料にし、確かめた記事は次から取りに行かない', async () => {
+        const feed = `<?xml version="1.0"?><rss><channel>${[101, 102, 103].map(n =>
+            `<item><title>決算の分析記事${n} | ビジネス | 東洋経済オンライン</title><link>https://toyokeizai.net/articles/-/${n}</link><category>ビジネス</category></item>`,
+        ).join('')}</channel></rss>`;
+        respond(url => {
+            if (url.endsWith('/rss')) return feed;
+            if (url.endsWith('/101')) return '<script type="application/ld+json">{"isAccessibleForFree": "False"}</script>';
+            if (url.endsWith('/102')) return '<html>無料記事</html>';
+            return null; // 103 は取得失敗
+        });
+        const items = await fetchToyoKeizaiNews();
+        expect(items.map(i => [i.title, i.paywall ?? false])).toEqual([['決算の分析記事101', true], ['決算の分析記事102', false], ['決算の分析記事103', false]]);
+
+        // 2 回目: 101・102 は覚えているので取りに行かず、失敗した 103 だけ確かめ直す
+        get.mockClear();
+        await fetchToyoKeizaiNews();
+        expect(get.mock.calls.map(([u]) => u)).toEqual(['https://toyokeizai.net/list/feed/rss', 'https://toyokeizai.net/articles/-/103']);
+    });
+
+    it('isNotFreeByJsonLd: 有料記事の構造化データだけに当たる', () => {
+        expect(isNotFreeByJsonLd('{"isAccessibleForFree": "False"}')).toBe(true);
+        expect(isNotFreeByJsonLd('{"isAccessibleForFree":false}')).toBe(true);
+        expect(isNotFreeByJsonLd('{"isAccessibleForFree": "True"}')).toBe(false);
+        expect(isNotFreeByJsonLd('有料会員限定機能です')).toBe(false);
+    });
+
+    // ダイヤモンドのテーマ一覧ページ（実物の構造を縮めたもの）
+    const diamondList = (rows: { id: number; title: string; mark?: 'gold' | 'silver' }[]) => `<div class="m-articles">${rows.map(r => `
+        <article class="m-article">
+          <a class="m-article__thumbnail-wrap" href="/articles/-/${r.id}"><img alt="${r.title}"></a>
+          <div class="m-article__info">
+            <a class="u-text-link" href="/articles/-/${r.id}"><h2 class="m-article__title${r.mark ? ` after-icon-${r.mark}` : ''}">${r.title}</h2></a>
+          </div>
+        </article>`).join('')}</div>`;
+    const diamondPage = (type: 'GOLD' | 'NORMAL', published: string) =>
+        `<meta name="cXenseParse:dia-articletype" content="${type}"><script type="application/ld+json">{"datePublished": "${published}"}</script>`;
+
+    it('ダイヤモンド: テーマ一覧から拾い、記事ページで配信日時と有料（GOLD）を確かめ、7 日より古い記事は出さない', async () => {
+        respond(url => {
+            if (url.includes(encodeURIComponent('銀行・証券・金融'))) return diamondList([
+                { id: 201, title: 'みずほ証券が「野村超え」宣言、提携戦略の全容', mark: 'gold' },
+                { id: 202, title: '出版社が船井電機を買収した舞台裏とは', mark: 'silver' },
+            ]);
+            if (url.includes(encodeURIComponent('予測・分析'))) return diamondList([
+                { id: 201, title: 'みずほ証券が「野村超え」宣言、提携戦略の全容', mark: 'gold' },
+                { id: 203, title: '日銀の利上げ後も円安が止まらない理由', mark: undefined },
+                { id: 204, title: '3 週間前の信用組合ランキング記事' },
+            ]);
+            if (url.includes('/list/theme/')) return null; // マネー・投資は取得失敗
+            if (url.endsWith('/201')) return diamondPage('GOLD', '2026-10-07T04:55:00+09:00');
+            if (url.endsWith('/202')) return diamondPage('NORMAL', '2026-10-08T10:00:00+09:00');
+            if (url.endsWith('/203')) return diamondPage('GOLD', '2026-10-09T07:00:00+09:00'); // 一覧に鍵が無くても記事ページで有料
+            if (url.endsWith('/204')) return diamondPage('NORMAL', '2026-09-18T07:00:00+09:00');
+            return null;
+        });
+        const items = await fetchDiamondNews(new Date('2026-10-09T12:00:00+09:00'));
+        expect(items.map(i => [i.url.replace('https://diamond.jp/articles/-/', ''), i.paywall ?? false, i.isoDate])).toEqual([
+            ['201', true, '2026-10-06T19:55:00.000Z'],
+            ['202', false, '2026-10-08T01:00:00.000Z'],
+            ['203', true, '2026-10-08T22:00:00.000Z'],
+        ]);
+        expect(items[0]).toMatchObject({ title: 'みずほ証券が「野村超え」宣言、提携戦略の全容', source: 'Diamond' });
+    });
+
+    it('ダイヤモンド: 記事ページが取れなくても、一覧の鍵マークで有料にする', async () => {
+        respond(url => (url.includes('/list/theme/') ? diamondList([{ id: 301, title: '地銀3行統合のワナと待ち受ける主導権争い', mark: 'gold' }]) : null));
+        const [item] = await fetchDiamondNews();
+        expect(item).toMatchObject({ url: 'https://diamond.jp/articles/-/301', paywall: true });
+    });
+
+    it('ダイヤモンド: 一覧が全部取れなければ、市況の語で絞った Google News 検索に切り替える', async () => {
+        respond(url => (url.includes('news.google.com')
+            ? rss([{ title: '絶好調ハイテク株もむしばむ金利上昇 - ダイヤモンド・オンライン', link: 'https://diamond.jp/a' }])
+            : null));
         expect((await fetchDiamondNews())[0]).toMatchObject({ title: '絶好調ハイテク株もむしばむ金利上昇', source: 'Diamond' });
-        const query = decodeURIComponent(get.mock.calls[0][0]);
+        const query = decodeURIComponent(get.mock.calls.map(([u]) => u).find(u => u.includes('news.google.com'))!);
         expect(query).toContain('site:diamond.jp -site:zai.diamond.jp');
         expect(query).toContain('金利');
+    });
+
+    it('inspectDiamondPage: 記事種別の meta が GOLD なら有料、配信日時は datePublished', () => {
+        expect(inspectDiamondPage(diamondPage('GOLD', '2026-10-07T04:55:00+09:00'))).toEqual({ paid: true, published: '2026-10-07T04:55:00+09:00' });
+        expect(inspectDiamondPage(diamondPage('NORMAL', '2026-10-07T04:55:00+09:00')).paid).toBe(false);
+        // サイト共通のポップアップの文言では有料にしない
+        expect(inspectDiamondPage("showPopup(tt, '有料会員限定機能です')")).toEqual({ paid: false, published: undefined });
     });
 });

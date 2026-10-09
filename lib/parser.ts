@@ -11,6 +11,7 @@ export interface NewsItem {
     source: NewsSource;
     time: string;       // 表示用 (例: "14:25" または "07/22 14:25")
     isoDate?: string;   // ソート用 ISO 8601 文字列
+    paywall?: boolean;  // 記事ページで有料と確かめた（見出しから判定できない媒体用。lib/paywall.ts が使う）
 }
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -342,14 +343,112 @@ export async function fetchToyoKeizaiNews(): Promise<NewsItem[]> {
     const items = await fetchRssUrls(['https://toyokeizai.net/list/feed/rss'], 'ToyoKeizai', 'ToyoKeizai RSS',
         t => t.replace(/\s*[|｜][^|｜]*[|｜]\s*東洋経済オンライン\s*$/, ''),
         ['政治・経済・投資', 'ビジネス']);
-    return items.slice(0, 30);
+    // RSS にも見出しにも有料の印が無いので、記事ページの構造化データで確かめる
+    return enrichFromPage(items.slice(0, 30), html => ({ paid: isNotFreeByJsonLd(html) }));
+}
+
+/** 構造化データ（JSON-LD）の isAccessibleForFree が false なら有料。東洋経済の有料記事のページにだけ入っている */
+export function isNotFreeByJsonLd(html: string): boolean {
+    return /"isAccessibleForFree"\s*:\s*"?false/i.test(html);
+}
+
+interface PageInfo {
+    paid: boolean;
+    published?: string;
+}
+
+// 記事 URL ごとに記事ページから読んだ情報。有料・無料も配信日時も後から変わらないので、一度確かめたら取りに行かない
+const pageInfoByUrl = new Map<string, PageInfo>();
+const PAGE_INFO_CACHE_MAX = 2000;
+
+/**
+ * 記事ページを取り、inspect の結果で paywall と（無ければ）配信日時を補う。
+ * 取れなかった記事はそのまま出し（有料の印なし）、次回の取得で確かめ直す
+ */
+async function enrichFromPage(items: NewsItem[], inspect: (html: string) => PageInfo): Promise<NewsItem[]> {
+    const unknown = items.filter(item => !pageInfoByUrl.has(item.url));
+    const results = await Promise.allSettled(unknown.map(item => axios.get(item.url, {
+        headers: { 'User-Agent': USER_AGENT },
+        timeout: 8000,
+        responseType: 'text',
+    })));
+    results.forEach((result, i) => {
+        if (result.status === 'fulfilled') {
+            pageInfoByUrl.set(unknown[i].url, inspect(String(result.value.data)));
+        } else {
+            const error = result.reason;
+            console.error(`article page fetch failed for ${unknown[i].url}:`, error instanceof Error ? error.message : error);
+        }
+    });
+    // 古いものから捨てる（Map は挿入順）
+    while (pageInfoByUrl.size > PAGE_INFO_CACHE_MAX) pageInfoByUrl.delete(pageInfoByUrl.keys().next().value as string);
+
+    return items.map(item => {
+        const info = pageInfoByUrl.get(item.url);
+        if (!info) return item;
+        let next = item;
+        if (info.paid) next = { ...next, paywall: true };
+        if (!next.isoDate && info.published) next = { ...next, ...parseDateInfo(info.published) };
+        return next;
+    });
+}
+
+// 市況に近いテーマの一覧ページ。一覧には直リンクと有料の鍵マークが出る（日時は出ない）
+const DIAMOND_THEMES = ['銀行・証券・金融', '予測・分析', 'マネー・投資'];
+// テーマの一覧には数週間前の記事も残っているので、これより古い記事は出さない
+const DIAMOND_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** ダイヤモンドの記事ページ: 有料会員限定なら記事種別の meta が GOLD（無料は NORMAL）。配信日時は JSON-LD の datePublished */
+export function inspectDiamondPage(html: string): PageInfo {
+    return {
+        paid: /dia-articletype"\s+content="GOLD"/.test(html),
+        published: html.match(/"datePublished"\s*:\s*"([^"]+)"/)?.[1],
+    };
+}
+
+/** ダイヤモンドのテーマ一覧ページから記事を拾う。見出しに after-icon-gold が付いていれば有料会員限定 */
+export function parseDiamondList(html: string): NewsItem[] {
+    const $ = cheerio.load(html);
+    const items: NewsItem[] = [];
+    $('a.u-text-link[href^="/articles/-/"]').each((_, el) => {
+        const a = $(el);
+        const url = `https://diamond.jp${a.attr('href')}`;
+        const title = a.text().trim().replace(/\s+/g, ' ');
+        if (isNoisyTitle(title) || items.some(n => n.url === url)) return;
+        const paid = a.find('.after-icon-gold').length > 0;
+        items.push({ title, url, source: 'Diamond', time: '', ...(paid ? { paywall: true } : {}) });
+    });
+    return items;
 }
 
 /**
- * ダイヤモンド・オンライン (Google News RSS 経由)。公式 RSS は自己啓発の連載が大半なので、
- * 市況の語を含む記事に絞る。ザイFX！も diamond.jp なので除く
+ * ダイヤモンド・オンライン。公式 RSS は自己啓発の連載が大半なので、市況に近いテーマの一覧ページから拾い、
+ * 記事ページで配信日時と有料かどうかを確かめる。一覧が取れないときは Google News（有料の判定なし）に切り替える
  */
-export async function fetchDiamondNews(): Promise<NewsItem[]> {
+export async function fetchDiamondNews(now: Date = new Date()): Promise<NewsItem[]> {
+    const results = await Promise.allSettled(DIAMOND_THEMES.map(theme =>
+        axios.get(`https://diamond.jp/list/theme/${encodeURIComponent(theme)}`, {
+            headers: { 'User-Agent': USER_AGENT },
+            timeout: 8000,
+            responseType: 'text',
+        })));
+    const listed: NewsItem[] = [];
+    results.forEach((result, i) => {
+        if (result.status === 'rejected') {
+            const error = result.reason;
+            console.error(`Diamond list fetch failed for ${DIAMOND_THEMES[i]}:`, error instanceof Error ? error.message : error);
+            return;
+        }
+        for (const item of parseDiamondList(String(result.value.data))) {
+            if (!listed.some(n => n.url === item.url)) listed.push(item);
+        }
+    });
+
+    if (listed.length > 0) {
+        const items = await enrichFromPage(listed.slice(0, 30), inspectDiamondPage);
+        return items.filter(item => !item.isoDate || now.getTime() - new Date(item.isoDate).getTime() <= DIAMOND_MAX_AGE_MS);
+    }
+
     const items = await fetchFromGoogleNewsRss(
         'site:diamond.jp -site:zai.diamond.jp (株価 OR 株式 OR 金利 OR 円安 OR 円高 OR 決算 OR 日銀 OR 景気 OR 物価 OR 為替 OR 投資) when:3d',
         'Diamond', 'ダイヤモンド・オンライン');
