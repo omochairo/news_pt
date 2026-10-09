@@ -75,8 +75,8 @@ describe('銘柄表と関連ニュース', () => {
         expect(detectRelatedMarkets('新発10年債利回りが一時3.1%')).toEqual(['JGB10Y']);
         expect(detectRelatedMarkets('日本国債の入札、需要は底堅い')).toEqual(['JGB10Y']);
         expect(detectRelatedMarkets('米10年債利回り5.33％に上昇')).toEqual(['^TNX']);
-        // 米国の話だが「米長期金利」とは書いていないので、どちらにも紐づけない
-        expect(detectRelatedMarkets('米雇用統計、長期金利低下促すハードル高い')).toEqual([]);
+        // 米国の話なので日本国債には紐づけない（米雇用統計から米国債とドル円には紐づく）
+        expect(detectRelatedMarkets('米雇用統計、長期金利低下促すハードル高い')).toEqual(['^TNX', 'JPY=X']);
         expect(detectRelatedMarkets('欧州国債早朝　ドイツ長期金利、低下')).toEqual([]);
     });
 });

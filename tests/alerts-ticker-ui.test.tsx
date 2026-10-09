@@ -175,23 +175,28 @@ describe('ティッカーと Sparkline', () => {
         { symbol: '^N225', name: '日経225', price: '--', change: '--', changePercent: '--', direction: 'flat', history: [] },
         { symbol: 'CL=F', name: '原油WTI', price: '$70.00', change: '-1.00', changePercent: '-1.40%', direction: 'down', history: [5] },
     ];
+    // 記事の下のチャートは related から world-markets の symbol で引く（取れていない銘柄はサーバーが返さない）
+    const related: SymbolMarketData[] = [
+        { symbol: '^VIX', name: '恐怖指数 VIX', price: '18.20', change: '+1.10', changePercent: '+6.43%', direction: 'up', history: [1, 2, 3] },
+        { symbol: 'CL=F', name: '原油 WTI', price: '70.00', change: '-1.00', changePercent: '-1.40%', direction: 'down', history: [5] },
+    ];
 
     it('取得した値をティッカーと Sparkline に配る。取れていない銘柄の Sparkline は出さない', async () => {
-        respond = () => json({ data });
+        respond = () => json({ data, related });
         const { container } = render(
             <MarketDataProvider>
                 <MarketTicker />
-                <Sparkline symbol="USD/JPY" />
-                <Sparkline symbol="日経225" />
-                <Sparkline symbol="原油WTI" compact />
+                <Sparkline symbol="^VIX" />
+                <Sparkline symbol="^N225" />
+                <Sparkline symbol="CL=F" compact />
             </MarketDataProvider>,
         );
         await waitFor(() => expect(container.querySelectorAll('.ticker-item')).toHaveLength(6)); // 2 セット
         expect(container.querySelector('.ticker-up')?.textContent).toContain('▲');
         expect(container.querySelector('.ticker-down')?.textContent).toContain('▼');
-        // USD/JPY はチャートつき、原油は点が 1 つなのでチャートなし、日経は出さない
+        // VIX はチャートつき、原油は点が 1 つなのでチャートなし、日経は取れていないので出さない
         const chips = [...container.querySelectorAll('div.inline-flex.font-mono')];
-        expect(chips.map(c => [c.textContent?.slice(0, 7), !!c.querySelector('svg')])).toEqual([['USD/JPY', true], ['原油WTI$7', false]]);
+        expect(chips.map(c => [c.textContent?.slice(0, 8), !!c.querySelector('svg')])).toEqual([['恐怖指数 VIX', true], ['原油 WTI70', false]]);
         fireEvent.mouseEnter(container.querySelector('.ticker-wrapper')!);
         expect(container.querySelector('.ticker-paused')).toBeTruthy();
         fireEvent.mouseLeave(container.querySelector('.ticker-wrapper')!);

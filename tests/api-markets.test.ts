@@ -121,6 +121,9 @@ describe('/api/market（ティッカー）', () => {
         const body = await (await market.GET()).json();
         expect(body.data).toHaveLength(9);
         expect(body.data.every((d: { price: string }) => d.price !== '--')).toBe(true);
+        // 記事の下のチャート用に、見出しと紐づく銘柄の値も返す
+        expect(body.related.length).toBeGreaterThan(9);
+        expect(body.related.find((d: { symbol: string }) => d.symbol === '^VIX')).toMatchObject({ name: '恐怖指数 VIX' });
         const calls = get.mock.calls.length;
         await world.GET();
         expect(get.mock.calls.length).toBe(calls); // 同じキャッシュを使う

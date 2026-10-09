@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { extractTrendKeywords } from '../lib/keywords';
 import { categorizeArticle, getCategoryConfig } from '../lib/categorizer';
 import { scoreImportance } from '../lib/importance';
-import { detectRelatedSymbol } from '../lib/market-data';
+import { detectPrimaryMarket } from '../lib/related-news';
 import type { NewsItem } from '../lib/parser';
 
 const n = (title: string): NewsItem => ({ title, url: title, source: 'Nikkei', time: '' });
@@ -37,20 +37,54 @@ describe('分類・重要度・関連銘柄', () => {
         expect(scoreImportance('新型スマートフォンを発表')).toBe('normal');
     });
 
-    it('detectRelatedSymbol: 暗号資産を為替より先に判定し、当てはまらなければ null', () => {
-        expect(detectRelatedSymbol('ビットコインが3億ドルの流入')).toBe('BTC/JPY');
-        expect(detectRelatedSymbol('円安が進行')).toBe('USD/JPY');
-        expect(detectRelatedSymbol('ユーロ円が上昇')).toBe('EUR/JPY');
-        expect(detectRelatedSymbol('日経平均が反発')).toBe('日経225');
-        expect(detectRelatedSymbol('ナスダックが最高値')).toBe('S&P 500');
-        expect(detectRelatedSymbol('OPECが減産')).toBe('原油WTI');
-        expect(detectRelatedSymbol('新型スマートフォンを発表')).toBeNull();
+    it('detectPrimaryMarket: 暗号資産を為替より先に判定し、当てはまらなければ null', () => {
+        expect(detectPrimaryMarket('ビットコインが3億ドルの流入')).toBe('BTC-JPY');
+        expect(detectPrimaryMarket('円安が進行')).toBe('JPY=X');
+        expect(detectPrimaryMarket('ユーロ円が上昇')).toBe('EURJPY=X');
+        expect(detectPrimaryMarket('日経平均が反発')).toBe('^N225');
+        expect(detectPrimaryMarket('ナスダックが最高値')).toBe('^IXIC');
+        expect(detectPrimaryMarket('OPECが減産')).toBe('CL=F');
+        expect(detectPrimaryMarket('新型スマートフォンを発表')).toBeNull();
     });
 
-    it('detectRelatedSymbol: 株価の値幅の「円高」や「ハードル高い」を為替にしない', () => {
-        expect(detectRelatedSymbol('日経平均、一時1000円高')).toBe('日経225');
-        expect(detectRelatedSymbol('日本株が反発、５００円高')).toBe('日経225');
-        expect(detectRelatedSymbol('利上げのハードル高い')).toBeNull();
-        expect(detectRelatedSymbol('円高が進み、日経平均は反落')).toBe('USD/JPY');
+    it('detectPrimaryMarket: 株価の値幅の「円高」や「ハードル高い」を為替にしない', () => {
+        expect(detectPrimaryMarket('日経平均、一時1000円高')).toBe('^N225');
+        expect(detectPrimaryMarket('日本株が反発、５００円高')).toBe('^N225');
+        expect(detectPrimaryMarket('利上げのハードル高い')).toBeNull();
+        expect(detectPrimaryMarket('円高が進み、日経平均は反落')).toBe('JPY=X');
+    });
+
+    it('detectPrimaryMarket: 主要 6 銘柄以外のチャートも出す', () => {
+        expect(detectPrimaryMarket('恐怖指数VIXが急上昇')).toBe('^VIX');
+        expect(detectPrimaryMarket('金価格が最高値を更新')).toBe('GC=F');
+        expect(detectPrimaryMarket('米長期金利が上昇')).toBe('^TNX');
+        expect(detectPrimaryMarket('長期金利が1.8%に上昇')).toBe('JGB10Y');
+        expect(detectPrimaryMarket('香港株が大幅安')).toBe('^HSI');
+        expect(detectPrimaryMarket('欧州株　英ＦＴ指数は続落、独ＤＡＸ指数は続伸')).toBe('^STOXX50E');
+        expect(detectPrimaryMarket('独ＤＡＸ指数が最高値')).toBe('^GDAXI');
+        expect(detectPrimaryMarket('ブラジル株が反発')).toBe('^BVSP');
+        expect(detectPrimaryMarket('イーサリアムが急伸')).toBe('ETH-JPY');
+        expect(detectPrimaryMarket('豪S&P/ASX200指数は8758.03で取引終了')).toBe('^AORD');
+        expect(detectPrimaryMarket('加S&P/TSX総合指数が続伸')).toBe('^GSPTSE');
+        expect(detectPrimaryMarket('米S&P500が最高値')).toBe('^GSPC');
+    });
+
+    it('detectPrimaryMarket: 銘柄名が無くても、企業名・中銀・地政学から引く。銘柄名があればそちらを優先する', () => {
+        expect(detectPrimaryMarket('FOMC、利下げを決定')).toBe('^TNX');
+        expect(detectPrimaryMarket('日銀が利上げを決定')).toBe('JPY=X');
+        expect(detectPrimaryMarket('トヨタが過去最高益')).toBe('^N225');
+        expect(detectPrimaryMarket('テスラの販売台数が減少')).toBe('^NYFANG');
+        expect(detectPrimaryMarket('TSMCが増産')).toBe('^TWII');
+        expect(detectPrimaryMarket('イラン情勢が緊迫')).toBe('CL=F');
+        expect(detectPrimaryMarket('ECB、政策金利を据え置き')).toBe('EURUSD=X');
+        expect(detectPrimaryMarket('トヨタ株高で日経平均が続伸')).toBe('^N225');
+        expect(detectPrimaryMarket('エヌビディア決算で半導体株が高い')).toBe('^SOX');
+        expect(detectPrimaryMarket('NYダウ反落、米国株は全面安')).toBe('^DJI');
+        expect(detectPrimaryMarket('香港株寄り付き　反発で始まる、米金利低下が支え')).toBe('^HSI');
+    });
+
+    it('detectPrimaryMarket: 「株価」は他国の名前が無いときだけ日本株にする', () => {
+        expect(detectPrimaryMarket('株価が乱高下')).toBe('^N225');
+        expect(detectPrimaryMarket('中国の株価が下落')).toBeNull();
     });
 });

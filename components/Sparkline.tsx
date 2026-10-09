@@ -1,16 +1,15 @@
 'use client';
 
 import React from 'react';
-import { RelatedSymbol } from '@/lib/market-data';
-import { useMarketQuote } from '@/lib/market-context';
+import { useRelatedQuote } from '@/lib/market-context';
 
 interface SparklineProps {
-    symbol: RelatedSymbol;
+    symbol: string; // world-markets の symbol（related-news.ts の detectPrimaryMarket の戻り値）
     compact?: boolean;
 }
 
 export default function Sparkline({ symbol, compact = false }: SparklineProps) {
-    const quote = useMarketQuote(symbol);
+    const quote = useRelatedQuote(symbol);
     // 相場データが未取得・取得失敗のときは、古い値を見せるより出さない
     if (!quote) return null;
 
