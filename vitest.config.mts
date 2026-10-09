@@ -5,7 +5,8 @@ export default defineConfig({
     // tsconfig の paths（@/*）と同じ。API ルートやコンポーネントは @/lib/... で import している
     resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },
     // JSX を React 17+ の自動ランタイムで変換する（コンポーネントのテスト用）
-    esbuild: { jsx: 'automatic' },
+    // （vitest 5 / Vite 8 から変換は esbuild でなく Oxc）
+    oxc: { jsx: { runtime: 'automatic' } },
     test: {
         // 既定は node。画面のテストはファイル先頭の `// @vitest-environment jsdom` で切り替える
         environment: 'node',

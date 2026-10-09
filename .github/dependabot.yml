@@ -5,7 +5,14 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # 型は実行環境（CI の Node 22）に合わせる。Node を上げるときに一緒に手で上げる
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
+      # @vitest/coverage-v8 は同じバージョンの vitest を peer に要求する
+      vitest:
+        patterns: ["vitest", "@vitest/*"]
       # next と eslint-config-next はバージョンを揃える必要がある
       next:
         patterns: ["next", "eslint-config-next"]
