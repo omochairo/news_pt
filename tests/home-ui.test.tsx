@@ -90,6 +90,32 @@ describe('ニュース画面', () => {
         expect(localStorage.getItem('vantage-point-unread-only')).toBe('0');
     });
 
+    it('有料記事を一括で隠し、設定を保存する', async () => {
+        (newsBody.bloomberg as NewsItem[]).push(news('Bloomberg', 'ブルームバーグの独自記事', 1));
+        await renderHome();
+        expect(screen.getAllByText('ブルームバーグの独自記事').length).toBeGreaterThan(0);
+        fireEvent.click(screen.getByTitle('有料記事を隠す'));
+        expect(localStorage.getItem('vantage-point-hide-paywall')).toBe('1');
+        // Bloomberg は全件有料扱い。無料の記事は残る
+        await waitFor(() => expect(screen.queryByText('ブルームバーグの独自記事')).toBeNull());
+        expect(screen.getAllByText('米大統領が演説を行った').length).toBeGreaterThan(0);
+        fireEvent.click(screen.getByTitle('有料記事を表示する'));
+        expect(localStorage.getItem('vantage-point-hide-paywall')).toBe('0');
+        expect((await screen.findAllByText('ブルームバーグの独自記事')).length).toBeGreaterThan(0);
+    });
+
+    it('有料記事を隠す設定を次回も引き継ぐ', async () => {
+        localStorage.setItem('vantage-point-hide-paywall', '1');
+        (newsBody.bloomberg as NewsItem[]).push(news('Bloomberg', 'ブルームバーグの独自記事', 1));
+        await renderHome();
+        expect(screen.getByTitle('有料記事を表示する')).toBeTruthy();
+        expect(screen.queryByText('ブルームバーグの独自記事')).toBeNull();
+        // 分割表示（媒体ごとの元データを受け取る）でも隠れたまま
+        fireEvent.click(screen.getByRole('button', { name: '画面分割表示' }));
+        await waitFor(() => expect(localStorage.getItem('vantage-point-viewmode')).toBe('split'));
+        expect(screen.queryByText('ブルームバーグの独自記事')).toBeNull();
+    });
+
     it('媒体の切り替えで外せる（最後の 1 つは外せない）', async () => {
         await renderHome();
         for (const label of ['Nikkei', 'みんかぶ', 'Bloomberg', 'Reuters', 'CNN']) {
