@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { MARKETS } from '@/lib/world-markets';
 import { get24hLastFetch, getQuotes24h, getWorldLastFetch, getWorldQuotes } from '@/lib/world-markets-cache';
-import { NEWS_SOURCES, getNews } from '@/lib/news-cache';
+import { NEWS_SOURCES, getNews, getNewsEmptySince } from '@/lib/news-cache';
 import { evaluateHealth } from '@/lib/health';
 
 /**
@@ -16,10 +16,11 @@ export async function GET() {
     const counts = news ? Object.fromEntries(NEWS_SOURCES.map(s => [s, news.data[s].length])) : {};
     const world = { lastFetch: getWorldLastFetch(), expected: MARKETS.length };
     const h24 = { lastFetch: get24hLastFetch(), expected: MARKETS.filter(m => m.h24).length };
-    const report = evaluateHealth({ world, h24, news: news && { counts, stale: news.cache === 'STALE-FALLBACK' } });
+    const emptySince = getNewsEmptySince();
+    const report = evaluateHealth({ world, h24, news: news && { counts, stale: news.cache === 'STALE-FALLBACK', emptySince } });
 
     return NextResponse.json(
-        { ...report, world, h24, news: news && { counts, updatedAt: news.data.updatedAt, cache: news.cache } },
+        { ...report, world, h24, news: news && { counts, emptySince, updatedAt: news.data.updatedAt, cache: news.cache } },
         { status: report.ok ? 200 : 503, headers: { 'Cache-Control': 'no-store' } },
     );
 }

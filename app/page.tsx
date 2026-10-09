@@ -103,15 +103,17 @@ export default function Home() {
         setReadUrls(markAsRead(url));
     };
 
-    const fetchNews = async () => {
+    // refresh は更新ボタンから。ブラウザと CDN のキャッシュ（5 分）を通さず、サーバーに取り直させる
+    const fetchNews = async (refresh = false) => {
         lastFetchRef.current = Date.now();
         setLoading(true);
         try {
-            const res = await fetch('/api/news');
+            const res = refresh ? await fetch('/api/news?refresh=true', { cache: 'no-store' }) : await fetch('/api/news');
             if (!res.ok) throw new Error('Failed to fetch');
             const json: NewsData = await res.json();
             setData(json);
-            setLastUpdated(new Date().toLocaleTimeString('ja-JP'));
+            // 受け取った時刻ではなく、サーバーが取得した時刻（キャッシュが返っても「今」に見えないように）
+            setLastUpdated(new Date(json.updatedAt).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo' }));
             
             // 取得した全記事をローカル履歴に保存
             const allFetched = [
@@ -358,7 +360,7 @@ export default function Home() {
                             </div>
 
                             <button
-                                onClick={fetchNews}
+                                onClick={() => fetchNews(true)}
                                 disabled={loading}
                                 className="header-action-btn"
                                 title={lastUpdated ? `ニュースを更新（最終更新 ${lastUpdated}）` : 'ニュースを更新'}

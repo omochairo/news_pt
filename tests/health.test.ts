@@ -30,4 +30,15 @@ describe('evaluateHealth', () => {
         expect(evaluateHealth({ ...healthy, news: { counts: { nikkei: 1 }, stale: true } }).problems).toEqual(['news: 取得に失敗し、古いキャッシュを返している']);
         expect(evaluateHealth({ ...healthy, news: null }).problems).toEqual(['news: 取得できない']);
     });
+
+    it('前回の記事を表示していても、0 件が 30 分以上続いた媒体は異常にする', () => {
+        const now = Date.parse(at);
+        const news = (since: string) => ({ counts: { nikkei: 30, reuters: 30 }, stale: false, emptySince: { reuters: since } });
+        expect(evaluateHealth({ ...healthy, news: news('2026-09-30T23:31:00.000Z') }, now).ok).toBe(true);
+        expect(evaluateHealth({ ...healthy, news: news('2026-09-30T23:30:00.000Z') }, now).problems)
+            .toEqual(['news/reuters: 30 分取れていない（前回の記事を表示中）']);
+        // 前回の記事も無ければ、従来どおり「0 件」だけを出す
+        expect(evaluateHealth({ ...healthy, news: { counts: { nikkei: 30, reuters: 0 }, stale: false, emptySince: { reuters: '2026-09-30T20:00:00.000Z' } } }, now).problems)
+            .toEqual(['news/reuters: 0 件']);
+    });
 });

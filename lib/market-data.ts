@@ -73,7 +73,8 @@ export function detectRelatedSymbol(title: string): RelatedSymbol | null {
         return 'BTC/JPY';
     }
     // 「ドル」単体は金額表記に当たるので、為替の文脈を表す語に限る
-    if (/円安|円高|円相場|為替|ドル円|ドル高|ドル安|介入|\byen\b|USD\/?JPY/i.test(title)) {
+    // 「1000円高」は株価の値幅、「ハードル高い」は為替ではないので除く（related-news.ts と同じ）
+    if (/(?<![\d０-９万千百])円[安高]|円相場|為替|ドル円|(?<!ー)ドル[高安]|介入|\byen\b|USD\/?JPY/i.test(title)) {
         return 'USD/JPY';
     }
     if (/ユーロ円|ユーロ高|ユーロ安|EUR\/?JPY/i.test(title)) {
