@@ -11,7 +11,8 @@ interface RelatedRule {
     unless?: RegExp;
     /**
      * 記事のチャートを 1 本選ぶときの優先度（小さいほど先。既定 2）。
-     * 0: 暗号資産（「3億ドル」など金額表記で為替に当たりやすいので先に見る）
+     * 0: 暗号資産の通貨名（「3億ドル」など金額表記で為替に当たりやすいので先に見る）
+     * 0.5: 通貨名の無い暗号資産の記事（「暗号資産市場でイーサリアムが急落」はイーサリアムを出す）
      * 1: 為替（「円高が進み、日経平均は反落」は為替の記事として扱う）
      * 3: 銘柄名そのものではなく、企業名・中銀・地政学などの連想で引くもの
      */
@@ -52,10 +53,15 @@ const RULES: RelatedRule[] = [
     { pattern: /銅価格|銅相場|銅先物|\bcopper\b/i, symbols: ['HG=F'] },
     { pattern: /原油|石油|ガソリン|\bWTI\b|Brent|OPEC|\boil\b/i, symbols: ['CL=F'] },
     { pattern: /天然ガス|\bLNG\b|natural gas/i, symbols: ['NG=F'] },
+    // 暗号資産は通貨ごとのチャートを出す。通貨名の無い業界・市場全体の記事だけ、代表としてビットコインを出す
     { pattern: /ビットコイン|bitcoin|\bBTC\b/i, symbols: ['BTC-JPY'], priority: 0 },
     // 「イーサネット」は除く
     { pattern: /イーサリアム|イーサ(?!ネット)|ethereum|\bETH\b/i, symbols: ['ETH-JPY'], priority: 0 },
-    { pattern: /暗号資産|仮想通貨|\bcrypto|\bXRP\b|ステーブルコイン|コインベース|Coinbase|バイナンス|Binance/i, symbols: ['BTC-JPY', 'ETH-JPY'], priority: 0 },
+    // 「リップル効果」（波及効果）は除く
+    { pattern: /\bXRP\b|リップル(?!効果)|\bRipple\b/i, symbols: ['XRP-JPY'], priority: 0 },
+    // 英字の「sol」は他の語に紛れるので、略号は大文字だけ
+    { pattern: /ソラナ|Solana|\bSOL\b/, symbols: ['SOL-JPY'], priority: 0 },
+    { pattern: /暗号資産|仮想通貨|\bcrypto|ステーブルコイン|コインベース|Coinbase|バイナンス|Binance/i, symbols: ['BTC-JPY', 'ETH-JPY'], priority: 0.5 },
     // アジア・オセアニア
     { pattern: /上海総合|中国株|上海株|本土株/, symbols: ['000001.SS'] },
     { pattern: /香港株|ハンセン|Hang Seng/i, symbols: ['^HSI'] },

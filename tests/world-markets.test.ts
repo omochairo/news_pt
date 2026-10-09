@@ -49,9 +49,15 @@ describe('parseSparkResponse', () => {
         expect(parseSparkResponse('oops')).toEqual([]);
     });
 
+    it('前日終値が壊れている銘柄は捨てる', () => {
+        // 上海総合の実データの形（前日終値が 0.0002）
+        expect(parseSparkResponse({ '000001.SS': { timestamp: [1], close: [3813.79], previousClose: 0.0002050505 } })).toEqual([]);
+        expect(parseSparkResponse({ X: { timestamp: [1], close: [100], previousClose: 250 } })).toEqual([]);
+    });
+
     it('履歴は上限まで間引き、最後の点を残す', () => {
         const close = Array.from({ length: 300 }, (_, i) => i + 1);
-        const [q] = parseSparkResponse({ X: { timestamp: close, close, previousClose: 1 } });
+        const [q] = parseSparkResponse({ X: { timestamp: close, close, previousClose: 290 } });
         expect(q.history).toHaveLength(HISTORY_MAX_POINTS);
         expect(q.history.at(-1)).toBe(300);
     });

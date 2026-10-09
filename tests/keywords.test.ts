@@ -47,6 +47,21 @@ describe('分類・重要度・関連銘柄', () => {
         expect(detectPrimaryMarket('新型スマートフォンを発表')).toBeNull();
     });
 
+    it('detectPrimaryMarket: 暗号資産は記事の通貨のチャートを出し、通貨名が無ければビットコインを出す', () => {
+        expect(detectPrimaryMarket('イーサリアムが急伸、ETF承認期待')).toBe('ETH-JPY');
+        expect(detectPrimaryMarket('暗号資産市場でイーサリアムが急落')).toBe('ETH-JPY');
+        expect(detectPrimaryMarket('仮想通貨XRPが反発、リップル社の訴訟終結で')).toBe('XRP-JPY');
+        expect(detectPrimaryMarket('ソラナ（SOL）、ETF申請が相次ぐ')).toBe('SOL-JPY');
+        expect(detectPrimaryMarket('Solana network outage')).toBe('SOL-JPY');
+        expect(detectPrimaryMarket('ビットコインとイーサリアムがそろって下落')).toBe('BTC-JPY');
+        expect(detectPrimaryMarket('イーサリアム、ビットコイン比で最安値')).toBe('ETH-JPY');
+        expect(detectPrimaryMarket('金融庁、暗号資産交換業者に報告命令')).toBe('BTC-JPY');
+        expect(detectPrimaryMarket('EU当局、未認可ステーブルコインを排除へ')).toBe('BTC-JPY');
+        // 波及効果の「リップル効果」、政府効率化の「日本版DOGE」は暗号資産ではない
+        expect(detectPrimaryMarket('利上げのリップル効果が広がる')).toBeNull();
+        expect(detectPrimaryMarket('日本版DOGE、EVやメタボ補助も争点')).toBeNull();
+    });
+
     it('detectPrimaryMarket: 株価の値幅の「円高」や「ハードル高い」を為替にしない', () => {
         expect(detectPrimaryMarket('日経平均、一時1000円高')).toBe('^N225');
         expect(detectPrimaryMarket('日本株が反発、５００円高')).toBe('^N225');
