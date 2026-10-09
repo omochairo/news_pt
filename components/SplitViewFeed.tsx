@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { NewsItem, NewsSource } from '@/lib/parser';
 import { NewsCategory, categorizeArticle } from '@/lib/categorizer';
 import { FeedData, collectBySources, compareByDateDesc, countByCategory } from '@/lib/feed';
-import SourceToggle from './SourceToggle';
+import SourceToggle, { ALL_SOURCES } from './SourceToggle';
 import CategoryTabs from './CategoryTabs';
 import CompactNewsList from './CompactNewsList';
 
@@ -104,7 +104,7 @@ function FeedPanel({ label, initialSources, data, onBookmark, bookmarkedUrls, re
 export default function SplitViewFeed(props: SplitViewFeedProps) {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
-            <FeedPanel {...props} label="A" initialSources={['Nikkei', 'MinkabuFX', 'Bloomberg', 'Reuters', 'CNN']} />
+            <FeedPanel {...props} label="A" initialSources={ALL_SOURCES.filter(s => s !== 'Crypto')} />
             <FeedPanel {...props} label="B" initialSources={['Crypto']} />
         </div>
     );

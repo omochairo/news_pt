@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { MARKETS } from '../lib/world-markets';
+import { SOURCES } from '../lib/sources';
 
 vi.mock('axios', () => ({ default: { get: vi.fn() } }));
 import axios from 'axios';
@@ -186,7 +187,7 @@ describe('/api/health', () => {
         }));
         return import('../app/api/health/route');
     }
-    const allNews = { nikkei: 3, minkabu: 3, bloomberg: 3, reuters: 3, cnn: 3, crypto: 3 };
+    const allNews = Object.fromEntries(SOURCES.map(s => [s.key, 3]));
 
     it('すべて取れていれば 200', async () => {
         serveSpark();
@@ -195,6 +196,15 @@ describe('/api/health', () => {
         expect(res.status).toBe(200);
         expect(res.headers.get('Cache-Control')).toBe('no-store');
         expect((await res.json()).ok).toBe(true);
+    });
+
+    it('監視対象外の媒体（東洋経済）は 0 件でも異常にしないが、件数は応答に出す', async () => {
+        serveSpark();
+        const { GET } = await loadHealth({ ...allNews, toyokeizai: 0 });
+        const res = await GET();
+        const body = await res.json();
+        expect(res.status).toBe(200);
+        expect(body.news.counts.toyokeizai).toBe(0);
     });
 
     it('相場の取得が 8 割を切る・ニュースの媒体が 0 件なら 503 と原因を返す', async () => {

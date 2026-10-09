@@ -2,17 +2,11 @@
 
 import React from 'react';
 import { NewsSource } from '@/lib/parser';
+import { SOURCES, SOURCE_BY_NAME } from '@/lib/sources';
 
-export const SOURCE_CONFIGS: Record<NewsSource, { label: string; color: string; icon: string }> = {
-    Nikkei: { label: '日経新聞', color: 'var(--accent-nikkei)', icon: '📰' },
-    MinkabuFX: { label: 'みんかぶFX', color: 'var(--accent-minkabu)', icon: '💱' },
-    Crypto: { label: '暗号資産', color: 'var(--accent-crypto)', icon: '₿' },
-    Bloomberg: { label: 'Bloomberg', color: 'var(--accent-bloomberg)', icon: '📊' },
-    Reuters: { label: 'Reuters', color: 'var(--accent-reuters)', icon: '🌐' },
-    CNN: { label: 'CNN Japan', color: 'var(--accent-cnn)', icon: '📺' },
-};
+export const SOURCE_CONFIGS = SOURCE_BY_NAME;
 
-export const ALL_SOURCES: NewsSource[] = ['Nikkei', 'MinkabuFX', 'Crypto', 'Bloomberg', 'Reuters', 'CNN'];
+export const ALL_SOURCES: NewsSource[] = SOURCES.map(s => s.source);
 
 interface SourceToggleProps {
     activeSources: Set<NewsSource>;

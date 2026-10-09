@@ -3,6 +3,7 @@ import { MARKETS } from '@/lib/world-markets';
 import { get24hLastFetch, getQuotes24h, getWorldLastFetch, getWorldQuotes } from '@/lib/world-markets-cache';
 import { NEWS_SOURCES, getNews, getNewsEmptySince } from '@/lib/news-cache';
 import { evaluateHealth } from '@/lib/health';
+import { UNMONITORED_SOURCES, type NewsKey } from '@/lib/sources';
 
 /**
  * 死活監視用。各取得元から実際に取れているかを返し、異常なら 503。
@@ -17,7 +18,12 @@ export async function GET() {
     const world = { lastFetch: getWorldLastFetch(), expected: MARKETS.length };
     const h24 = { lastFetch: get24hLastFetch(), expected: MARKETS.filter(m => m.h24).length };
     const emptySince = getNewsEmptySince();
-    const report = evaluateHealth({ world, h24, news: news && { counts, stale: news.cache === 'STALE-FALLBACK', emptySince } });
+    // 判定には監視対象の媒体だけを渡す（応答の counts / emptySince には全媒体を出す）
+    const monitored = <T,>(rec: Record<string, T>) => Object.fromEntries(Object.entries(rec).filter(([k]) => !UNMONITORED_SOURCES.has(k as NewsKey)));
+    const report = evaluateHealth({
+        world, h24,
+        news: news && { counts: monitored(counts), stale: news.cache === 'STALE-FALLBACK', emptySince: monitored(emptySince) },
+    });
 
     return NextResponse.json(
         { ...report, world, h24, news: news && { counts, emptySince, updatedAt: news.data.updatedAt, cache: news.cache } },

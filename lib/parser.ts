@@ -1,7 +1,9 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
-export type NewsSource = 'Bloomberg' | 'Reuters' | 'CNN' | 'Nikkei' | 'MinkabuFX' | 'Crypto';
+import type { NewsSource } from './sources';
+
+export type { NewsSource };
 
 export interface NewsItem {
     title: string;
@@ -86,7 +88,13 @@ export function isSafeHttpUrl(url: string): boolean {
 /**
  * RSS (RDF / RSS 2.0 / Atom) XML文字列から NewsItem[] をパースする共通ヘルパー
  */
-export function parseRssXml(xmlData: string, defaultSource: NewsSource, titleCleaner?: (t: string) => string): NewsItem[] {
+export function parseRssXml(
+    xmlData: string,
+    defaultSource: NewsSource,
+    titleCleaner?: (t: string) => string,
+    /** 指定すると、<category> がこのどれかに当たる記事だけを残す */
+    categories?: string[],
+): NewsItem[] {
     const $ = cheerio.load(xmlData, { xmlMode: true });
     const news: NewsItem[] = [];
 
@@ -94,7 +102,9 @@ export function parseRssXml(xmlData: string, defaultSource: NewsSource, titleCle
 
     items.each((_, el) => {
         const item = $(el);
-        let title = item.find('title').text().trim();
+        if (categories && !item.find('category').toArray().some(c => categories.includes($(c).text().trim()))) return;
+        // 改行入りの見出し（東洋経済など）を 1 行にする
+        let title = item.find('title').text().trim().replace(/\s*\n\s*/g, ' ');
         if (titleCleaner) {
             title = titleCleaner(title);
         }
@@ -131,7 +141,7 @@ export function parseRssXml(xmlData: string, defaultSource: NewsSource, titleCle
 /**
  * Google News RSS から指定されたクエリで記事を取得する共通関数
  */
-async function fetchFromGoogleNewsRss(query: string, source: NewsSource, cleanSuffix?: string): Promise<NewsItem[]> {
+async function fetchFromGoogleNewsRss(query: string, source: NewsSource, cleanSuffix?: string, extraCleaner?: (t: string) => string): Promise<NewsItem[]> {
     try {
         const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=ja&gl=JP&ceid=JP:ja`;
         const response = await axios.get(rssUrl, {
@@ -150,7 +160,8 @@ async function fetchFromGoogleNewsRss(query: string, source: NewsSource, cleanSu
                 cleaned = title.replace(/\s+[-–—]\s+[^-–—]+$/, '');
             }
             // 媒体側のタイトルに付いている「 | ロイター」等も落とす
-            return cleaned.replace(/\s*[|｜]\s*(ロイター|Reuters|ブルームバーグ|Bloomberg|CNN\.co\.jp|日本経済新聞)\s*$/i, '').trim();
+            cleaned = cleaned.replace(/\s*[|｜]\s*(ロイター|Reuters|ブルームバーグ|Bloomberg|CNN\.co\.jp|日本経済新聞)\s*$/i, '').trim();
+            return extraCleaner ? extraCleaner(cleaned).trim() : cleaned;
         });
     } catch (error) {
         console.error(`Google News RSS fetch failed for ${source} (${query}):`, error instanceof Error ? error.message : error);
@@ -169,7 +180,13 @@ async function fetchFromWorRdf(rdfUrls: string[], source: NewsSource): Promise<N
  * 複数の RSS URL を並列に取得し、URL の並び順を保ったまま重複を除いて結合する。
  * 直列だと 1 本 8 秒のタイムアウトが URL 数だけ積み上がり、関数の実行上限を超えうる。
  */
-async function fetchRssUrls(urls: string[], source: NewsSource, label: string): Promise<NewsItem[]> {
+async function fetchRssUrls(
+    urls: string[],
+    source: NewsSource,
+    label: string,
+    titleCleaner?: (t: string) => string,
+    categories?: string[],
+): Promise<NewsItem[]> {
     const results = await Promise.allSettled(
         urls.map(url => axios.get(url, {
             headers: { 'User-Agent': USER_AGENT },
@@ -184,7 +201,7 @@ async function fetchRssUrls(urls: string[], source: NewsSource, label: string): 
             console.error(`${label} fetch failed for ${urls[i]}:`, error instanceof Error ? error.message : error);
             return;
         }
-        for (const item of parseRssXml(result.value.data, source)) {
+        for (const item of parseRssXml(result.value.data, source, titleCleaner, categories)) {
             if (!allItems.some(n => n.url === item.url || n.title === item.title)) {
                 allItems.push(item);
             }
@@ -276,4 +293,65 @@ export async function fetchCryptoNews(): Promise<NewsItem[]> {
 
     // フォールバック: Google News RSS
     return fetchFromGoogleNewsRss('暗号資産 OR ビットコイン OR イーサリアム when:2d', 'Crypto');
+}
+
+// 日銀の新着情報のうち、市場に関係しない事務連絡（採用・説明会・なりすまし注意など）
+const BOJ_NOISE = /募集|説明会|座談会|採用|不審|ご注意|職員/;
+
+/**
+ * 日本銀行 新着情報 (公式 RSS)。金融政策・統計・総裁の講演など一次情報
+ */
+export async function fetchBOJNews(): Promise<NewsItem[]> {
+    const items = await fetchRssUrls(['https://www.boj.or.jp/rss/whatsnew.xml'], 'BOJ', 'BOJ RSS');
+    return items.filter(item => !BOJ_NOISE.test(item.title)).slice(0, 30);
+}
+
+/**
+ * 株探 (Google News RSS 経由)。個別株の材料・決算・ストップ高安
+ */
+export async function fetchKabutanNews(): Promise<NewsItem[]> {
+    const items = await fetchFromGoogleNewsRss('site:kabutan.jp when:2d', 'Kabutan', '株探');
+    return items.slice(0, 30);
+}
+
+/**
+ * トレーダーズ・ウェブ (Google News RSS 経由)。前場・後場コメント、今日の株価材料
+ */
+export async function fetchTradersWebNews(): Promise<NewsItem[]> {
+    // 見出しの末尾に「 | 個別記事 | ニュース」のような分類が付く
+    const items = await fetchFromGoogleNewsRss('site:traders.co.jp when:3d', 'TradersWeb', 'トレーダーズ・ウェブ',
+        t => t.replace(/(\s*[|｜]\s*[^|｜]{1,12})+$/, ''));
+    return items.slice(0, 30);
+}
+
+/**
+ * ザイFX！ (Google News RSS 経由)。為替の市況速報
+ */
+export async function fetchZaiFXNews(): Promise<NewsItem[]> {
+    // 見出しの末尾に「｜FX・為替ニュース」が付く
+    const items = await fetchFromGoogleNewsRss('site:zai.diamond.jp when:3d', 'ZaiFX', 'ザイFX',
+        t => t.replace(/\s*[|｜]\s*FX・為替ニュース$/, ''));
+    return items.slice(0, 30);
+}
+
+/**
+ * 東洋経済オンライン (公式 RSS)。半分以上が生活・キャリアの記事なので、配信のカテゴリで経済・ビジネスに絞る
+ */
+export async function fetchToyoKeizaiNews(): Promise<NewsItem[]> {
+    // 見出しの末尾に「 | 政治・経済・投資 | 東洋経済オンライン」が付く
+    const items = await fetchRssUrls(['https://toyokeizai.net/list/feed/rss'], 'ToyoKeizai', 'ToyoKeizai RSS',
+        t => t.replace(/\s*[|｜][^|｜]*[|｜]\s*東洋経済オンライン\s*$/, ''),
+        ['政治・経済・投資', 'ビジネス']);
+    return items.slice(0, 30);
+}
+
+/**
+ * ダイヤモンド・オンライン (Google News RSS 経由)。公式 RSS は自己啓発の連載が大半なので、
+ * 市況の語を含む記事に絞る。ザイFX！も diamond.jp なので除く
+ */
+export async function fetchDiamondNews(): Promise<NewsItem[]> {
+    const items = await fetchFromGoogleNewsRss(
+        'site:diamond.jp -site:zai.diamond.jp (株価 OR 株式 OR 金利 OR 円安 OR 円高 OR 決算 OR 日銀 OR 景気 OR 物価 OR 為替 OR 投資) when:3d',
+        'Diamond', 'ダイヤモンド・オンライン');
+    return items.slice(0, 30);
 }

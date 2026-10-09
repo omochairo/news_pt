@@ -20,18 +20,11 @@ import HistoryList from '@/components/HistoryList';
 import EconomicCalendar from '@/components/EconomicCalendar';
 import PWAInstallPrompt from '@/components/PWAInstallPrompt';
 import { saveToDailyHistory, getDailyHistory, DailyHistory } from '@/lib/history';
-import { compareByDateDesc } from '@/lib/feed';
+import { FeedData, collectBySources, compareByDateDesc } from '@/lib/feed';
+import { SOURCES } from '@/lib/sources';
 import { checkPaywall } from '@/lib/paywall';
 
-interface NewsData {
-    nikkei?: NewsItem[];
-    minkabu?: NewsItem[];
-    bloomberg?: NewsItem[];
-    reuters?: NewsItem[];
-    cnn?: NewsItem[];
-    crypto?: NewsItem[];
-    updatedAt: string;
-}
+type NewsData = FeedData & { updatedAt: string };
 
 type ViewMode = 'modern' | 'terminal' | 'split';
 const VIEWMODE_STORAGE_KEY = 'vantage-point-viewmode';
@@ -131,14 +124,7 @@ export default function Home() {
             setLastUpdated(new Date(json.updatedAt).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo' }));
             
             // 取得した全記事をローカル履歴に保存
-            const allFetched = [
-                ...(json.nikkei || []),
-                ...(json.minkabu || []),
-                ...(json.crypto || []),
-                ...(json.bloomberg || []),
-                ...(json.reuters || []),
-                ...(json.cnn || []),
-            ];
+            const allFetched = SOURCES.flatMap(s => json[s.key] || []);
             saveToDailyHistory(allFetched);
             setHistoryData(getDailyHistory());
         } catch (error) {
@@ -199,26 +185,14 @@ export default function Home() {
     // 有料記事を隠す設定のときは、どの表示モードにも出さない（件数・トレンド語も含めて）
     const shownData = useMemo(() => {
         if (!data || !hidePaywall) return data;
-        const free = (items?: NewsItem[]) => items?.filter(item => !checkPaywall(item).isPaywall);
-        return {
-            ...data,
-            nikkei: free(data.nikkei), minkabu: free(data.minkabu), bloomberg: free(data.bloomberg),
-            reuters: free(data.reuters), cnn: free(data.cnn), crypto: free(data.crypto),
-        };
+        const free: NewsData = { ...data };
+        for (const { key } of SOURCES) free[key] = data[key]?.filter(item => !checkPaywall(item).isPaywall);
+        return free;
     }, [data, hidePaywall]);
 
     // 全ソースを統合して時間順にソート（タイムライン）
     const timelineItems = useMemo(() => {
-        if (!shownData) return [];
-        const all: NewsItem[] = [];
-        if (activeSources.has('Nikkei')) all.push(...(shownData.nikkei || []));
-        if (activeSources.has('MinkabuFX')) all.push(...(shownData.minkabu || []));
-        if (activeSources.has('Crypto')) all.push(...(shownData.crypto || []));
-        if (activeSources.has('Bloomberg')) all.push(...(shownData.bloomberg || []));
-        if (activeSources.has('Reuters')) all.push(...(shownData.reuters || []));
-        if (activeSources.has('CNN')) all.push(...(shownData.cnn || []));
-
-        const filtered = filterItems(all);
+        const filtered = filterItems(collectBySources(shownData, activeSources));
 
         return filtered.sort(compareByDateDesc);
     }, [shownData, activeSources, filterItems]);
@@ -226,14 +200,7 @@ export default function Home() {
     // 全アイテム一覧（トレンド抽出用）
     const allRawItems = useMemo(() => {
         if (!shownData) return [];
-        return [
-            ...(shownData.nikkei || []),
-            ...(shownData.minkabu || []),
-            ...(shownData.crypto || []),
-            ...(shownData.bloomberg || []),
-            ...(shownData.reuters || []),
-            ...(shownData.cnn || []),
-        ];
+        return SOURCES.flatMap(s => shownData[s.key] || []);
     }, [shownData]);
 
     // トレンドキーワード抽出
@@ -243,15 +210,7 @@ export default function Home() {
 
     // カテゴリごとのカウント
     const categoryCounts = useMemo(() => {
-        const allRaw: NewsItem[] = [];
-        if (shownData) {
-            if (activeSources.has('Nikkei')) allRaw.push(...(shownData.nikkei || []));
-            if (activeSources.has('MinkabuFX')) allRaw.push(...(shownData.minkabu || []));
-            if (activeSources.has('Crypto')) allRaw.push(...(shownData.crypto || []));
-            if (activeSources.has('Bloomberg')) allRaw.push(...(shownData.bloomberg || []));
-            if (activeSources.has('Reuters')) allRaw.push(...(shownData.reuters || []));
-            if (activeSources.has('CNN')) allRaw.push(...(shownData.cnn || []));
-        }
+        const allRaw = collectBySources(shownData, activeSources);
         const counts: Record<NewsCategory, number> = {
             all: allRaw.length,
             fx: 0, stocks: 0, bonds: 0, commodities: 0, crypto: 0, economy: 0,
