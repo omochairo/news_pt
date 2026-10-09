@@ -5,6 +5,12 @@ import type { NewsItem, NewsSource } from '../lib/parser';
 const news = (source: NewsSource, title: string, url = 'https://example.com/x'): NewsItem => ({ source, title, url, time: '' });
 
 describe('checkPaywall', () => {
+    it('取得時に記事ページで有料と確かめた記事（paywall）は有料', () => {
+        expect(checkPaywall({ ...news('ToyoKeizai', '中堅電炉メーカーの下方修正'), paywall: true }))
+            .toEqual({ isPaywall: true, label: '🔒 有料会員限定' });
+        expect(checkPaywall(news('ToyoKeizai', '中堅電炉メーカーの下方修正')).isPaywall).toBe(false);
+    });
+
     it('Bloomberg は全件有料', () => {
         expect(checkPaywall(news('Bloomberg', '円相場'))).toEqual({ isPaywall: true, label: '🔒 有料記事' });
     });
