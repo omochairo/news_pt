@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { NewsItem } from '@/lib/parser';
+import { SOURCE_BY_NAME } from '@/lib/sources';
 import { scoreImportance } from '@/lib/importance';
 import { categorizeArticle, getCategoryConfig } from '@/lib/categorizer';
 import { detectRelatedSymbol } from '@/lib/market-data';
@@ -76,14 +77,7 @@ export default function TerminalNewsGrid({ items, onBookmark, bookmarkedUrls, re
                                     {/* SOURCE */}
                                     <td className="py-2 px-3 whitespace-nowrap font-bold">
                                         <span
-                                            className={`px-1.5 py-0.5 rounded text-[10px] ${
-                                                item.source === 'Bloomberg' ? 'bg-blue-900/60 text-blue-300 border border-blue-700/50' :
-                                                item.source === 'Reuters' ? 'bg-amber-900/60 text-amber-300 border border-amber-700/50' :
-                                                item.source === 'Nikkei' ? 'bg-indigo-900/60 text-indigo-300 border border-indigo-700/50' :
-                                                item.source === 'MinkabuFX' ? 'bg-yellow-900/60 text-yellow-300 border border-yellow-700/50' :
-                                                item.source === 'Crypto' ? 'bg-orange-900/60 text-orange-300 border border-orange-700/50' :
-                                                'bg-red-900/60 text-red-300 border border-red-700/50'
-                                            }`}
+                                            className={`px-1.5 py-0.5 rounded text-[10px] ${SOURCE_BY_NAME[item.source]?.badge ?? ''}`}
                                         >
                                             {item.source}
                                         </span>

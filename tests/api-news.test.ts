@@ -8,6 +8,12 @@ const fetchers = {
     fetchReutersNews: vi.fn(),
     fetchCNNNews: vi.fn(),
     fetchCryptoNews: vi.fn(),
+    fetchBOJNews: vi.fn(),
+    fetchKabutanNews: vi.fn(),
+    fetchTradersWebNews: vi.fn(),
+    fetchZaiFXNews: vi.fn(),
+    fetchToyoKeizaiNews: vi.fn(),
+    fetchDiamondNews: vi.fn(),
 };
 vi.mock('../lib/parser', () => fetchers);
 
@@ -30,12 +36,15 @@ afterEach(() => {
 });
 
 describe('/api/news', () => {
-    it('6 媒体を取り、5 分はキャッシュ（X-Cache: HIT）を返す', async () => {
+    it('12 媒体を取り、5 分はキャッシュ（X-Cache: HIT）を返す', async () => {
         const { GET } = await loadRoute();
         const first = await GET(req());
         expect(first.headers.get('X-Cache')).toBe('MISS');
         const body = await first.json();
-        expect(Object.keys(body).sort()).toEqual(['bloomberg', 'cnn', 'crypto', 'minkabu', 'nikkei', 'reuters', 'updatedAt']);
+        expect(Object.keys(body).sort()).toEqual([
+            'bloomberg', 'boj', 'cnn', 'crypto', 'diamond', 'kabutan', 'minkabu', 'nikkei', 'reuters', 'toyokeizai', 'traders', 'updatedAt', 'zai',
+        ]);
+        expect(Object.values(fetchers).every(f => f.mock.calls.length === 1)).toBe(true);
         const second = await GET(req());
         expect(second.headers.get('X-Cache')).toBe('HIT');
         expect(fetchers.fetchNikkeiNews).toHaveBeenCalledTimes(1);

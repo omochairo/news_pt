@@ -5,22 +5,36 @@ import {
     fetchNikkeiNews,
     fetchMinkabuFXNews,
     fetchCryptoNews,
+    fetchBOJNews,
+    fetchKabutanNews,
+    fetchTradersWebNews,
+    fetchZaiFXNews,
+    fetchToyoKeizaiNews,
+    fetchDiamondNews,
     NewsItem,
 } from './parser';
+import { SOURCES, type NewsKey } from './sources';
 
 /** /api/news と /api/health が共有するニュースの取得とキャッシュ */
 
-export interface NewsData {
-    nikkei: NewsItem[];
-    minkabu: NewsItem[];
-    bloomberg: NewsItem[];
-    reuters: NewsItem[];
-    cnn: NewsItem[];
-    crypto: NewsItem[];
-    updatedAt: string;
-}
+export type NewsData = Record<NewsKey, NewsItem[]> & { updatedAt: string };
 
-export const NEWS_SOURCES = ['nikkei', 'minkabu', 'bloomberg', 'reuters', 'cnn', 'crypto'] as const;
+export const NEWS_SOURCES: readonly NewsKey[] = SOURCES.map(s => s.key);
+
+const FETCHERS: Record<NewsKey, () => Promise<NewsItem[]>> = {
+    nikkei: fetchNikkeiNews,
+    minkabu: fetchMinkabuFXNews,
+    crypto: fetchCryptoNews,
+    bloomberg: fetchBloombergNews,
+    reuters: fetchReutersNews,
+    cnn: fetchCNNNews,
+    boj: fetchBOJNews,
+    kabutan: fetchKabutanNews,
+    traders: fetchTradersWebNews,
+    zai: fetchZaiFXNews,
+    toyokeizai: fetchToyoKeizaiNews,
+    diamond: fetchDiamondNews,
+};
 
 // メモリ内キャッシュ (サーバーが起動している間保持)
 let memoryCache: { data: NewsData; timestamp: number } | null = null;
@@ -32,27 +46,16 @@ let inflight: Promise<NewsData> | null = null;
 
 async function fetchAllNews(): Promise<NewsData> {
     // Promise.allSettled で一部が失敗しても全滅しないように取得
-    const [nikkeiRes, minkabuRes, bloombergRes, reutersRes, cnnRes, cryptoRes] = await Promise.allSettled([
-        fetchNikkeiNews(),
-        fetchMinkabuFXNews(),
-        fetchBloombergNews(),
-        fetchReutersNews(),
-        fetchCNNNews(),
-        fetchCryptoNews(),
-    ]);
-
-    return {
-        nikkei: nikkeiRes.status === 'fulfilled' ? nikkeiRes.value : [],
-        minkabu: minkabuRes.status === 'fulfilled' ? minkabuRes.value : [],
-        bloomberg: bloombergRes.status === 'fulfilled' ? bloombergRes.value : [],
-        reuters: reutersRes.status === 'fulfilled' ? reutersRes.value : [],
-        cnn: cnnRes.status === 'fulfilled' ? cnnRes.value : [],
-        crypto: cryptoRes.status === 'fulfilled' ? cryptoRes.value : [],
-        updatedAt: new Date().toISOString(),
-    };
+    // （同期的に例外を投げる取得関数も、ここで拾わずに外へ伝える。古いキャッシュへのフォールバックに使う）
+    const results = await Promise.allSettled(NEWS_SOURCES.map(key => FETCHERS[key]()));
+    const data = Object.fromEntries(NEWS_SOURCES.map((key, i) => {
+        const r = results[i];
+        return [key, r.status === 'fulfilled' ? r.value : []];
+    })) as Record<NewsKey, NewsItem[]>;
+    return { ...data, updatedAt: new Date().toISOString() };
 }
 
-export type NewsSource = (typeof NEWS_SOURCES)[number];
+export type NewsSource = NewsKey;
 
 // 媒体ごとに、0 件が続いている最初の時刻（取れたら消す）。/api/health が長く続く停止を見つけるのに使う
 let emptySince: Partial<Record<NewsSource, string>> = {};

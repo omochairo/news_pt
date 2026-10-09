@@ -1,30 +1,15 @@
 import type { NewsItem, NewsSource } from './parser';
+import { SOURCES, type NewsKey } from './sources';
 import { categorizeArticle, type NewsCategory } from './categorizer';
 
 /** /api/news のレスポンス（媒体ごとの記事配列） */
-export interface FeedData {
-    nikkei?: NewsItem[];
-    minkabu?: NewsItem[];
-    bloomberg?: NewsItem[];
-    reuters?: NewsItem[];
-    cnn?: NewsItem[];
-    crypto?: NewsItem[];
-}
-
-const SOURCE_KEYS: [NewsSource, keyof FeedData][] = [
-    ['Nikkei', 'nikkei'],
-    ['MinkabuFX', 'minkabu'],
-    ['Crypto', 'crypto'],
-    ['Bloomberg', 'bloomberg'],
-    ['Reuters', 'reuters'],
-    ['CNN', 'cnn'],
-];
+export type FeedData = Partial<Record<NewsKey, NewsItem[]>>;
 
 /** 選択中の媒体の記事をまとめて返す */
 export function collectBySources(data: FeedData | null, sources: Set<NewsSource>): NewsItem[] {
     if (!data) return [];
     const items: NewsItem[] = [];
-    for (const [source, key] of SOURCE_KEYS) {
+    for (const { source, key } of SOURCES) {
         if (sources.has(source)) items.push(...(data[key] || []));
     }
     return items;

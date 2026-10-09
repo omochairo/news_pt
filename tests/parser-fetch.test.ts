@@ -4,7 +4,13 @@ vi.mock('axios', () => ({ default: { get: vi.fn() } }));
 import axios from 'axios';
 import {
     fetchBloombergNews,
+    fetchBOJNews,
     fetchCNNNews,
+    fetchDiamondNews,
+    fetchKabutanNews,
+    fetchToyoKeizaiNews,
+    fetchTradersWebNews,
+    fetchZaiFXNews,
     fetchCryptoNews,
     fetchMinkabuFXNews,
     fetchNikkeiNews,
@@ -104,5 +110,54 @@ describe('RSS を直接取る媒体', () => {
             { title: '', link: 'https://coinpost.jp/b' },
         ]));
         expect((await fetchCryptoNews()).map(i => i.title)).toEqual(['通る記事の見出し']);
+    });
+});
+
+describe('追加した媒体', () => {
+    it('日銀: 公式 RSS を直接取り、採用・説明会・なりすまし注意などの事務連絡を除く', async () => {
+        respond(() => rss([
+            { title: '金融政策決定会合における主な意見（9月17、18日開催分）', link: 'https://www.boj.or.jp/a' },
+            { title: '日本銀行に関する学生向けの説明会、職員との座談会への参加募集について', link: 'https://www.boj.or.jp/b' },
+            { title: '日本銀行の関与を装った不審な連絡にご注意ください', link: 'https://www.boj.or.jp/c' },
+            { title: '【挨拶】植田総裁（全国証券大会）', link: 'https://www.boj.or.jp/d' },
+        ]));
+        const items = await fetchBOJNews();
+        expect(items.map(i => i.title)).toEqual(['金融政策決定会合における主な意見（9月17、18日開催分）', '【挨拶】植田総裁（全国証券大会）']);
+        expect(items[0].source).toBe('BOJ');
+        expect(get.mock.calls[0][0]).toBe('https://www.boj.or.jp/rss/whatsnew.xml');
+    });
+
+    it('株探・トレーダーズ・ウェブ・ザイFX！: Google News の site: 検索で取り、見出し末尾の分類を落とす', async () => {
+        respond(url => {
+            if (url.includes('kabutan')) return rss([{ title: '話題株ピックアップ【夕刊】（3）：ニデック - 株探', link: 'https://kabutan.jp/a' }]);
+            if (url.includes('traders')) return rss([{ title: '今日の株価材料－ファストリが大幅増配 | 個別記事 | ニュース - トレーダーズ・ウェブ', link: 'https://www.traders.co.jp/a' }]);
+            return rss([{ title: '10月8日のNY為替・原油概況｜FX・為替ニュース - ザイFX！', link: 'https://zai.diamond.jp/a' }]);
+        });
+        expect((await fetchKabutanNews())[0]).toMatchObject({ title: '話題株ピックアップ【夕刊】（3）：ニデック', source: 'Kabutan' });
+        expect((await fetchTradersWebNews())[0]).toMatchObject({ title: '今日の株価材料－ファストリが大幅増配', source: 'TradersWeb' });
+        expect((await fetchZaiFXNews())[0]).toMatchObject({ title: '10月8日のNY為替・原油概況', source: 'ZaiFX' });
+        expect(decodeURIComponent(get.mock.calls[0][0])).toContain('site:kabutan.jp');
+    });
+
+    it('東洋経済: 配信のカテゴリで経済・ビジネスに絞り、改行入りの見出しと末尾の分類を整える', async () => {
+        const item = (title: string, category: string, n: number) =>
+            `<item><title><![CDATA[\n  ${title} | ${category} | 東洋経済オンライン\n]]></title><link>https://toyokeizai.net/articles/-/${n}</link><category>${category}</category></item>`;
+        respond(() => `<?xml version="1.0"?><rss><channel>${[
+            item('中部鋼鈑が今期業績を下方修正した事情', '政治・経済・投資', 1),
+            item('育休中の妻だけが貧しくなった', 'ライフ', 2),
+            item('｢5年先のスズキ車｣の姿', 'ビジネス', 3),
+            item('定番のボウリング大会はなぜなくならないのか', 'キャリア・教育', 4),
+        ].join('')}</channel></rss>`);
+        const items = await fetchToyoKeizaiNews();
+        expect(items.map(i => i.title)).toEqual(['中部鋼鈑が今期業績を下方修正した事情', '｢5年先のスズキ車｣の姿']);
+        expect(items[0].source).toBe('ToyoKeizai');
+    });
+
+    it('ダイヤモンド: 市況の語で絞った Google News 検索で取り、ザイFX！を除く', async () => {
+        respond(() => rss([{ title: '絶好調ハイテク株もむしばむ金利上昇 - ダイヤモンド・オンライン', link: 'https://diamond.jp/a' }]));
+        expect((await fetchDiamondNews())[0]).toMatchObject({ title: '絶好調ハイテク株もむしばむ金利上昇', source: 'Diamond' });
+        const query = decodeURIComponent(get.mock.calls[0][0]);
+        expect(query).toContain('site:diamond.jp -site:zai.diamond.jp');
+        expect(query).toContain('金利');
     });
 });

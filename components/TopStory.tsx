@@ -2,20 +2,14 @@
 
 import React from 'react';
 import { NewsItem, NewsSource } from '@/lib/parser';
+import { SOURCES } from '@/lib/sources';
 import { scoreImportance, IMPORTANCE_CONFIGS } from '@/lib/importance';
 import { categorizeArticle, getCategoryConfig } from '@/lib/categorizer';
 import { detectRelatedSymbol } from '@/lib/market-data';
 import { checkPaywall } from '@/lib/paywall';
 import Sparkline from './Sparkline';
 
-const SOURCE_COLORS: Record<NewsSource, string> = {
-    Bloomberg: 'var(--accent-bloomberg)',
-    Reuters: 'var(--accent-reuters)',
-    CNN: 'var(--accent-cnn)',
-    Nikkei: 'var(--accent-nikkei)',
-    MinkabuFX: 'var(--accent-minkabu)',
-    Crypto: 'var(--accent-crypto)',
-};
+const SOURCE_COLORS = Object.fromEntries(SOURCES.map(s => [s.source, s.color])) as Record<NewsSource, string>;
 
 interface TopStoryProps {
     item: NewsItem;
