@@ -101,7 +101,8 @@ export async function getNews(requestRefresh = false): Promise<NewsResult> {
             inflight = fetchAllNews().then(fresh => keepPreviousOnEmpty(fresh, now)).finally(() => { inflight = null; });
         }
         const result = await inflight;
-        memoryCache = { data: result, timestamp: now };
+        // 取得に時間がかかっても TTL が短くならないよう、取得が終わった時刻を記録する
+        memoryCache = { data: result, timestamp: Date.now() };
         return { data: result, cache: 'MISS' };
     } catch (error) {
         console.error('API Error in /api/news:', error);

@@ -110,9 +110,13 @@ export function parseRssXml(
             title = titleCleaner(title);
         }
 
-        let url = item.find('link').text().trim();
-        if (!url) {
-            url = item.find('link').attr('href') || '';
+        // Atom は <link> が複数ある（rel="self" は配信元の URL）。記事の URL は rel が無いか "alternate" のもの
+        let url = '';
+        for (const link of item.find('link').toArray()) {
+            const rel = $(link).attr('rel');
+            if (rel && rel !== 'alternate') continue;
+            url = $(link).text().trim() || $(link).attr('href') || '';
+            if (url) break;
         }
 
         const dateStr =
