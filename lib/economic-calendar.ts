@@ -23,7 +23,9 @@ export interface EconomicEvent {
  *  - ECB:  https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html
  *  - 日銀: https://www.boj.or.jp/mopo/mpmsche_minu/index.htm
  *  - 米雇用統計 / CPI: https://www.bls.gov/schedule/news_release/
- * 欧州は 10/25、米国は 11/1 に夏時間が終わるので、それ以降は JST で1時間遅くなる。
+ * 欧州は 10/25、米国は 11/1 に夏時間が終わるので、それ以降は JST で1時間遅くなる（米国は 2027/3/14 から再び夏時間）。
+ * 米雇用統計・CPI は BLS の公式日程（empsit.htm / cpi.htm）で 2027/6 分まで確認済み（2026/11/3）。
+ * 日銀・ECB の 2027/6 分までは、公式ページを取得して得た日程（同日）。FOMC の 2027 年は FRB が未公表。
  * 前回値・予想値は未入力（'—'）。
  */
 export const ECONOMIC_EVENTS: EconomicEvent[] = [
@@ -39,6 +41,26 @@ export const ECONOMIC_EVENTS: EconomicEvent[] = [
     { id: 'static-10', source: 'bls', date: '2026-12-10', time: '22:30', country: 'US', countryName: '米国', flag: '🇺🇸', event: '米 CPI (消費者物価指数, 11月分)', importance: 'high', previous: '—', forecast: '—' },
     { id: 'static-11', source: 'ecb', date: '2026-12-17', time: '22:15', country: 'EU', countryName: 'ユーロ圏', flag: '🇪🇺', event: 'ECB 政策金利発表 & 総裁会見', importance: 'high', previous: '—', forecast: '—' },
     { id: 'static-12', source: 'boj', date: '2026-12-18', time: '12:00', country: 'JP', countryName: '日本', flag: '🇯🇵', event: '日銀 金融政策決定会合 結果公表 (時刻は目安)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-13', source: 'bls', date: '2027-01-08', time: '22:30', country: 'US', countryName: '米国', flag: '🇺🇸', event: '米 雇用統計 (12月分)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-14', source: 'bls', date: '2027-01-13', time: '22:30', country: 'US', countryName: '米国', flag: '🇺🇸', event: '米 CPI (消費者物価指数, 12月分)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-15', source: 'bls', date: '2027-02-05', time: '22:30', country: 'US', countryName: '米国', flag: '🇺🇸', event: '米 雇用統計 (1月分)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-16', source: 'bls', date: '2027-02-11', time: '22:30', country: 'US', countryName: '米国', flag: '🇺🇸', event: '米 CPI (消費者物価指数, 1月分)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-17', source: 'bls', date: '2027-03-05', time: '22:30', country: 'US', countryName: '米国', flag: '🇺🇸', event: '米 雇用統計 (2月分)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-18', source: 'bls', date: '2027-03-10', time: '22:30', country: 'US', countryName: '米国', flag: '🇺🇸', event: '米 CPI (消費者物価指数, 2月分)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-19', source: 'bls', date: '2027-04-02', time: '21:30', country: 'US', countryName: '米国', flag: '🇺🇸', event: '米 雇用統計 (3月分)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-20', source: 'bls', date: '2027-04-13', time: '21:30', country: 'US', countryName: '米国', flag: '🇺🇸', event: '米 CPI (消費者物価指数, 3月分)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-21', source: 'bls', date: '2027-05-07', time: '21:30', country: 'US', countryName: '米国', flag: '🇺🇸', event: '米 雇用統計 (4月分)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-22', source: 'bls', date: '2027-05-12', time: '21:30', country: 'US', countryName: '米国', flag: '🇺🇸', event: '米 CPI (消費者物価指数, 4月分)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-23', source: 'bls', date: '2027-06-04', time: '21:30', country: 'US', countryName: '米国', flag: '🇺🇸', event: '米 雇用統計 (5月分)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-24', source: 'bls', date: '2027-06-10', time: '21:30', country: 'US', countryName: '米国', flag: '🇺🇸', event: '米 CPI (消費者物価指数, 5月分)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-25', source: 'boj', date: '2027-01-22', time: '12:00', country: 'JP', countryName: '日本', flag: '🇯🇵', event: '日銀 金融政策決定会合 結果公表 (時刻は目安)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-26', source: 'ecb', date: '2027-02-04', time: '22:15', country: 'EU', countryName: 'ユーロ圏', flag: '🇪🇺', event: 'ECB 政策金利発表 & 総裁会見', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-27', source: 'boj', date: '2027-03-18', time: '12:00', country: 'JP', countryName: '日本', flag: '🇯🇵', event: '日銀 金融政策決定会合 結果公表 (時刻は目安)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-28', source: 'ecb', date: '2027-03-18', time: '22:15', country: 'EU', countryName: 'ユーロ圏', flag: '🇪🇺', event: 'ECB 政策金利発表 & 総裁会見', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-29', source: 'boj', date: '2027-04-28', time: '12:00', country: 'JP', countryName: '日本', flag: '🇯🇵', event: '日銀 金融政策決定会合 結果公表 (時刻は目安)', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-30', source: 'ecb', date: '2027-04-29', time: '21:15', country: 'EU', countryName: 'ユーロ圏', flag: '🇪🇺', event: 'ECB 政策金利発表 & 総裁会見', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-31', source: 'ecb', date: '2027-06-10', time: '21:15', country: 'EU', countryName: 'ユーロ圏', flag: '🇪🇺', event: 'ECB 政策金利発表 & 総裁会見', importance: 'high', previous: '—', forecast: '—' },
+    { id: 'static-32', source: 'boj', date: '2027-06-11', time: '12:00', country: 'JP', countryName: '日本', flag: '🇯🇵', event: '日銀 金融政策決定会合 結果公表 (時刻は目安)', importance: 'high', previous: '—', forecast: '—' },
 ];
 
 /** JST で書かれた日付・時刻を絶対時刻に変換する（閲覧端末のタイムゾーンに依存させない） */
