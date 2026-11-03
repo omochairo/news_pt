@@ -1,4 +1,5 @@
 import { NewsItem } from './parser';
+import { includesKeyword } from './categorizer';
 
 export interface TrendKeyword {
     word: string;
@@ -39,7 +40,7 @@ export function extractTrendKeywords(items: NewsItem[], limit: number = 10): Tre
 
         // 1. 優先キーワードのマッチング
         for (const term of FINANCIAL_PRIORITY_TERMS) {
-            if (title.includes(term)) {
+            if (includesKeyword(title, term, false)) {
                 wordCounts[term] = (wordCounts[term] || 0) + 2; // 重要語はカウント+2
             }
         }
