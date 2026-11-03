@@ -1,3 +1,5 @@
+import { includesKeyword } from './categorizer';
+
 /**
  * ニュース記事の重要度スコアリング
  * タイトルのキーワードから BREAKING / HIGH / NORMAL を判定
@@ -61,11 +63,9 @@ const HIGH_KEYWORDS = [
  * タイトルから重要度を判定する
  */
 export function scoreImportance(title: string): ImportanceLevel {
-    const lower = title.toLowerCase();
-
     // BREAKING判定
     for (const kw of BREAKING_KEYWORDS) {
-        if (lower.includes(kw.toLowerCase())) {
+        if (includesKeyword(title, kw)) {
             return 'breaking';
         }
     }
@@ -73,7 +73,7 @@ export function scoreImportance(title: string): ImportanceLevel {
     // HIGH判定（2つ以上のHIGHキーワードがあればHIGH）
     let highCount = 0;
     for (const kw of HIGH_KEYWORDS) {
-        if (lower.includes(kw.toLowerCase())) {
+        if (includesKeyword(title, kw)) {
             highCount++;
         }
     }

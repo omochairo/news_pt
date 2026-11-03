@@ -28,6 +28,8 @@ export const CATEGORIES: CategoryConfig[] = [
         keywords: [
             '円', 'ドル', 'ユーロ', 'ポンド', '為替', 'FX', 'forex',
             'USD', 'JPY', 'EUR', 'GBP', 'AUD', 'CHF', 'CAD', 'NZD',
+            // スラッシュ無しの通貨ペア表記（語境界つき照合だと USD・JPY に分解して当たらない）
+            'USDJPY', 'EURJPY', 'GBPJPY', 'AUDJPY', 'EURUSD', 'GBPUSD', 'AUDUSD',
             'yen', 'dollar', 'euro', 'pound', 'currency', 'exchange rate',
             '通貨', '外国為替', '円安', '円高', 'ドル高', 'ドル安',
         ],
@@ -97,12 +99,34 @@ export const CATEGORIES: CategoryConfig[] = [
     },
 ];
 
+const keywordRegexCache = new Map<string, RegExp>();
+
+/**
+ * 見出しにキーワードが含まれるか。英字のキーワードは語の途中に当たらないようにする
+ * （「Boeing」の BOE、「offered」の Fed、「solar」の SOL など）。
+ * 英字は語頭が英数字でないこと、4 文字以下の略語は語末に英字が続かないこと（複数形の s は許す。S&P500 のように数字は続いてよい）を条件にする。
+ * 日本語のキーワードは従来どおり部分一致
+ */
+export function includesKeyword(text: string, keyword: string, ignoreCase = true): boolean {
+    if (!/^[\x21-\x7e]+$/.test(keyword)) {
+        return ignoreCase ? text.toLowerCase().includes(keyword.toLowerCase()) : text.includes(keyword);
+    }
+    const cacheKey = `${ignoreCase ? 'i' : 's'}:${keyword}`;
+    let re = keywordRegexCache.get(cacheKey);
+    if (!re) {
+        const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const tail = keyword.length <= 4 ? "(?:'?s)?(?![A-Za-z])" : '';
+        re = new RegExp(`(?<![A-Za-z0-9])${escaped}${tail}`, ignoreCase ? 'i' : '');
+        keywordRegexCache.set(cacheKey, re);
+    }
+    return re.test(text);
+}
+
 /**
  * 記事タイトルからカテゴリを自動判定する
  * 複数カテゴリに該当する場合は、最もマッチ数が多いカテゴリを返す
  */
 export function categorizeArticle(title: string): NewsCategory {
-    const lowerTitle = title.toLowerCase();
     // どのカテゴリのキーワードにも当たらなければ 'all'（未分類）。
     // 以前は 'economy' を既定にしていたため、無関係な記事が「経済指標」タブに流れ込んでいた。
     let bestCategory: NewsCategory = 'all';
@@ -113,7 +137,7 @@ export function categorizeArticle(title: string): NewsCategory {
 
         let score = 0;
         for (const keyword of cat.keywords) {
-            if (lowerTitle.includes(keyword.toLowerCase())) {
+            if (includesKeyword(title, keyword)) {
                 score++;
             }
         }
