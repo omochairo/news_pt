@@ -10,8 +10,8 @@ export function getReadUrls(): Set<string> {
     if (typeof window === 'undefined') return new Set();
     try {
         const raw = localStorage.getItem(READ_STATUS_STORAGE_KEY);
-        const list: string[] = raw ? JSON.parse(raw) : [];
-        return new Set(list);
+        const list: unknown = raw ? JSON.parse(raw) : [];
+        return new Set(Array.isArray(list) ? (list as string[]) : []);
     } catch {
         return new Set();
     }

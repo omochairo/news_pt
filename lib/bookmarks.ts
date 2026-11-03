@@ -21,9 +21,19 @@ export function getBookmarks(): BookmarkedItem[] {
     if (typeof window === 'undefined') return [];
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        return raw ? JSON.parse(raw) : [];
+        const parsed: unknown = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
     } catch {
         return [];
+    }
+}
+
+// 容量超過・プライベートモード等で保存できなくても、開いている間の表示は続ける
+function save(items: BookmarkedItem[]) {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    } catch {
+        // 保存失敗は無視
     }
 }
 
@@ -39,7 +49,7 @@ export function addBookmark(item: Omit<BookmarkedItem, 'savedAt'>): BookmarkedIt
         savedAt: new Date().toISOString(),
     };
     const updated = [newItem, ...bookmarks];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    save(updated);
     return updated;
 }
 
@@ -48,7 +58,7 @@ export function addBookmark(item: Omit<BookmarkedItem, 'savedAt'>): BookmarkedIt
  */
 export function removeBookmark(url: string): BookmarkedItem[] {
     const bookmarks = getBookmarks().filter(b => b.url !== url);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
+    save(bookmarks);
     return bookmarks;
 }
 

@@ -21,7 +21,8 @@ export function saveToDailyHistory(news: NewsItem[]) {
 
     try {
         const raw = localStorage.getItem(HISTORY_KEY);
-        let history: DailyHistory[] = raw ? JSON.parse(raw) : [];
+        const parsed: unknown = raw ? JSON.parse(raw) : [];
+        let history: DailyHistory[] = Array.isArray(parsed) ? parsed : [];
 
         // 日本時間の YYYY-MM-DD を取得
         const now = new Date();
@@ -74,7 +75,8 @@ export function getDailyHistory(): DailyHistory[] {
     if (typeof window === 'undefined') return [];
     try {
         const raw = localStorage.getItem(HISTORY_KEY);
-        return raw ? JSON.parse(raw) : [];
+        const parsed: unknown = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
     } catch {
         return [];
     }
