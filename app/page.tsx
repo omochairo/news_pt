@@ -59,11 +59,11 @@ export default function Home() {
         setReadUrls(getReadUrls());
 
         // ローカルストレージから表示モードを復元
-        const savedViewMode = localStorage.getItem(VIEWMODE_STORAGE_KEY) as ViewMode;
-        if (savedViewMode === 'terminal' || savedViewMode === 'modern' || savedViewMode === 'split') {
-            setViewMode(savedViewMode);
-        }
         try {
+            const savedViewMode = localStorage.getItem(VIEWMODE_STORAGE_KEY);
+            if (savedViewMode === 'terminal' || savedViewMode === 'modern' || savedViewMode === 'split') {
+                setViewMode(savedViewMode);
+            }
             setUnreadOnly(localStorage.getItem(UNREAD_ONLY_STORAGE_KEY) === '1');
             setHidePaywall(localStorage.getItem(HIDE_PAYWALL_STORAGE_KEY) === '1');
         } catch {
@@ -102,7 +102,11 @@ export default function Home() {
 
     const changeViewMode = (mode: ViewMode) => {
         setViewMode(mode);
-        localStorage.setItem(VIEWMODE_STORAGE_KEY, mode);
+        try {
+            localStorage.setItem(VIEWMODE_STORAGE_KEY, mode);
+        } catch {
+            // 保存できなくても表示の切り替えは効かせる
+        }
     };
 
     const bookmarkedUrls = useMemo(() => new Set(bookmarks.map(b => b.url)), [bookmarks]);
