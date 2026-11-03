@@ -9,7 +9,9 @@ const STATIC_ASSETS = [
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll(STATIC_ASSETS);
+            // 事前キャッシュはあくまで補助。デプロイ中の 5xx などで 1 件でも取れないと addAll 全体が
+            // reject して SW が入らなくなるので、失敗してもインストールは続ける
+            return cache.addAll(STATIC_ASSETS).catch((err) => console.warn('SW precache failed:', err));
         })
     );
     self.skipWaiting();
