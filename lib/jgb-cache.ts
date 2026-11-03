@@ -22,6 +22,13 @@ function cachedRows(url: string, ttl: number) {
                     .finally(() => { inflight = null; });
             }
             const rows = await inflight;
+            // 200 で HTML のエラーページなどが返ると行が 0 件になる。取得済みの行があるならそれを捨てず、
+            // 次の取り直しまで（TTL）前の値を使う
+            if (rows.length === 0 && cache && cache.rows.length > 0) {
+                console.error(`MOF CSV had no rows for ${url}; keeping previous data`);
+                cache = { rows: cache.rows, at: Date.now() };
+                return cache.rows;
+            }
             cache = { rows, at: Date.now() };
             return rows;
         } catch (error) {
