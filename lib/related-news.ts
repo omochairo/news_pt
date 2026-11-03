@@ -46,7 +46,7 @@ const RULES: RelatedRule[] = [
     { pattern: /米国債|米10年債|米長期金利|米金利|\bTreasur(y|ies)\b/i, symbols: ['^TNX'] },
     { pattern: /日本国債|円債|国債先物|\bJGB/i, symbols: ['JGB10Y'] },
     // 「長期金利」「10年債」だけでは国が分からないので、他国の名前が無い見出しに限って日本の国債とみなす
-    { pattern: /長期金利|10年債/, symbols: ['JGB10Y'], unless: /米|ドイツ|独|英|欧州|ユーロ|仏|伊|豪|中国|NY|FRB|ECB/ },
+    { pattern: /長期金利|10年債/, symbols: ['JGB10Y'], unless: /米|[独英仏伊](?=長期|10年|国債|金利|債|株|中銀|首相|大統領|政府|経済)|ドイツ|英国|欧州|ユーロ|豪|中国|NY|FRB|ECB/ },
     // 商品・暗号資産
     { pattern: /金価格|金相場|金先物|\bgold\b/i, symbols: ['GC=F'] },
     { pattern: /銀価格|銀相場|銀先物|\bsilver\b/i, symbols: ['SI=F'] },

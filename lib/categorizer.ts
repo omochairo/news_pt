@@ -99,6 +99,15 @@ export const CATEGORIES: CategoryConfig[] = [
     },
 ];
 
+/**
+ * 1 文字の日本語キーワードは、別の語の一部に当たりやすいものだけ除外を付ける。
+ * 「金」は資金・金融・金利・金曜など、「銀」は日銀・銀行に当たってコモディティと誤分類されるのを防ぐ
+ */
+const SHORT_JA_KEYWORDS: Record<string, RegExp> = {
+    '金': /(?<![資基現預賃税献送保年料])金(?![融利庫額曜])/,
+    '銀': /(?<!日)銀(?!行)/,
+};
+
 const keywordRegexCache = new Map<string, RegExp>();
 
 /**
@@ -108,6 +117,8 @@ const keywordRegexCache = new Map<string, RegExp>();
  * 日本語のキーワードは従来どおり部分一致
  */
 export function includesKeyword(text: string, keyword: string, ignoreCase = true): boolean {
+    const special = SHORT_JA_KEYWORDS[keyword];
+    if (special) return special.test(text);
     if (!/^[\x21-\x7e]+$/.test(keyword)) {
         return ignoreCase ? text.toLowerCase().includes(keyword.toLowerCase()) : text.includes(keyword);
     }
