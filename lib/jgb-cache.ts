@@ -7,6 +7,8 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 // 日次（翌営業日の朝に更新）なので長めに持つ。全期間の CSV は約 1.2MB あるので、要るときだけ取る
 const CURRENT_TTL_MS = 60 * 60 * 1000;
 const ALL_TTL_MS = 6 * 60 * 60 * 1000;
+// 取得に失敗して古い値を返すときは、この間は取りに行かない（障害中に毎リクエスト最大 10 秒待たないため）
+const RETRY_AFTER_ERROR_MS = 60 * 1000;
 
 /** 期限つきキャッシュと同時要求の集約。取れなかったときは古い値があればそれを使う */
 function cachedRows(url: string, ttl: number) {
@@ -29,11 +31,15 @@ function cachedRows(url: string, ttl: number) {
                 cache = { rows: cache.rows, at: Date.now() };
                 return cache.rows;
             }
-            cache = { rows, at: Date.now() };
+            // 最初から 0 件のときも TTL いっぱい（最長 6 時間）空のまま持たず、1 分後に取り直す
+            cache = { rows, at: rows.length === 0 ? Date.now() - ttl + RETRY_AFTER_ERROR_MS : Date.now() };
             return rows;
         } catch (error) {
             console.error(`MOF CSV fetch failed for ${url}:`, error instanceof Error ? error.message : error);
-            if (cache) return cache.rows;
+            if (cache) {
+                cache = { rows: cache.rows, at: Date.now() - ttl + RETRY_AFTER_ERROR_MS };
+                return cache.rows;
+            }
             throw error;
         }
     };
