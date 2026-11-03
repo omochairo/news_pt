@@ -25,10 +25,10 @@ function cachedRows(url: string, ttl: number) {
             }
             const rows = await inflight;
             // 200 で HTML のエラーページなどが返ると行が 0 件になる。取得済みの行があるならそれを捨てず、
-            // 次の取り直しまで（TTL）前の値を使う
+            // 1 分後に取り直すまで前の値を使う
             if (rows.length === 0 && cache && cache.rows.length > 0) {
                 console.error(`MOF CSV had no rows for ${url}; keeping previous data`);
-                cache = { rows: cache.rows, at: Date.now() };
+                cache = { rows: cache.rows, at: Date.now() - ttl + RETRY_AFTER_ERROR_MS };
                 return cache.rows;
             }
             // 最初から 0 件のときも TTL いっぱい（最長 6 時間）空のまま持たず、1 分後に取り直す

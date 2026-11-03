@@ -59,4 +59,19 @@ describe('jgb-cache: 財務省が落ちているとき', () => {
         get.mockResolvedValue({ data: CSV });
         expect((await getJgbQuote())?.price).toBe(2.15);
     });
+
+    it('取得済みの行があるとき 0 行が返っても、1 分後には取り直す（最長 6 時間待たない）', async () => {
+        const { getJgbQuote } = await import('../lib/jgb-cache');
+        get.mockResolvedValueOnce({ data: CSV });
+        expect((await getJgbQuote())?.price).toBe(2.15);
+
+        vi.setSystemTime(new Date('2026-11-03T01:00:01Z'));
+        get.mockResolvedValue({ data: '<html>メンテナンス中</html>' });
+        expect((await getJgbQuote())?.price).toBe(2.15);
+
+        // 1 分後に復旧した CSV（新しい基準日）を拾う
+        vi.setSystemTime(new Date('2026-11-03T01:01:10Z'));
+        get.mockResolvedValue({ data: `${CSV}\nR8.11.01,1,1,1,1,1,1,1,1,1,2.200` });
+        expect((await getJgbQuote())?.price).toBe(2.2);
+    });
 });
