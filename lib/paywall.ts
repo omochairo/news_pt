@@ -29,10 +29,13 @@ export function checkPaywall(item: NewsItem): PaywallInfo {
         return { isPaywall: true, label: '🔒 有料記事' };
     }
 
+    // 「有料道路」など、記事の有料とは関係の無い語は先に除く
+    const checked = title.replace(NOT_PAYWALL_WORDS, '');
+
     // 2. 日経新聞 (Nikkei) でキーワードまたは特定の記事パターン
     if (source === 'Nikkei') {
         if (
-            title.includes('有料') ||
+            checked.includes('有料') ||
             title.includes('会員限定') ||
             title.includes('［有料会員限定］') ||
             title.includes('（有料）')
@@ -45,8 +48,7 @@ export function checkPaywall(item: NewsItem): PaywallInfo {
         }
     }
 
-    // 3. キーワード判定（「有料道路」など、記事の有料とは関係の無い語は先に除く）
-    const checked = title.replace(NOT_PAYWALL_WORDS, '');
+    // 3. キーワード判定
     const lowerTitle = checked.toLowerCase();
     for (const kw of PAYWALL_KEYWORDS) {
         if (checked.includes(kw) || lowerTitle.includes(kw)) {

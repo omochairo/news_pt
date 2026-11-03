@@ -27,6 +27,10 @@ describe('Issue #55: ニュース取得・解析', () => {
         const base = { source: 'CNN', url: 'https://x/', time: '' } as never;
         expect(checkPaywall({ ...(base as object), title: '有料道路の料金改定' } as never).isPaywall).toBe(false);
         expect(checkPaywall({ ...(base as object), title: '【有料】相場の読み方' } as never).isPaywall).toBe(true);
+        // 日経の分岐でも同じ。/nkd/ の URL は記事パターンで有料にならない
+        const nikkei = { source: 'Nikkei', url: 'https://www.nikkei.com/nkd/x', time: '' };
+        expect(checkPaywall({ ...nikkei, title: '有料道路の料金改定' } as never).isPaywall).toBe(false);
+        expect(checkPaywall({ ...nikkei, title: '【有料】相場の読み方' } as never).isPaywall).toBe(true);
     });
 
     it('「独自」を含む見出しでも長期金利は日本国債と関連づける。「独長期金利」は別', () => {
