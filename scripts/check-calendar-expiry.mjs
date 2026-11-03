@@ -15,7 +15,8 @@ const sources = [...new Set(ECONOMIC_EVENTS.map(e => e.source))];
 for (const source of sources) {
     const last = Math.max(...ECONOMIC_EVENTS.filter(e => e.source === source).map(e => toJstDate(e.date, e.time).getTime()));
     const daysLeft = Math.floor((last - now) / DAY_MS);
-    const lastDate = new Date(last).toISOString().slice(0, 10);
+    // 予定表は JST の日付で書かれているので、表示も JST にする（UTC だと早朝の予定が前日になる）
+    const lastDate = new Date(last + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const line = `${source}: 最後の予定 ${lastDate}（残り ${daysLeft} 日）`;
     if (daysLeft >= thresholdDays) {
         console.log(`ok   ${line}`);
