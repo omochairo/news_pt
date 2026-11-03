@@ -28,6 +28,8 @@ export const CATEGORIES: CategoryConfig[] = [
         keywords: [
             '円', 'ドル', 'ユーロ', 'ポンド', '為替', 'FX', 'forex',
             'USD', 'JPY', 'EUR', 'GBP', 'AUD', 'CHF', 'CAD', 'NZD',
+            // スラッシュ無しの通貨ペア表記（語境界つき照合だと USD・JPY に分解して当たらない）
+            'USDJPY', 'EURJPY', 'GBPJPY', 'AUDJPY', 'EURUSD', 'GBPUSD', 'AUDUSD',
             'yen', 'dollar', 'euro', 'pound', 'currency', 'exchange rate',
             '通貨', '外国為替', '円安', '円高', 'ドル高', 'ドル安',
         ],
@@ -102,7 +104,7 @@ const keywordRegexCache = new Map<string, RegExp>();
 /**
  * 見出しにキーワードが含まれるか。英字のキーワードは語の途中に当たらないようにする
  * （「Boeing」の BOE、「offered」の Fed、「solar」の SOL など）。
- * 英字は語頭が英数字でないこと、4 文字以下の略語は語末も英数字でないこと（複数形の s は許す）を条件にする。
+ * 英字は語頭が英数字でないこと、4 文字以下の略語は語末に英字が続かないこと（複数形の s は許す。S&P500 のように数字は続いてよい）を条件にする。
  * 日本語のキーワードは従来どおり部分一致
  */
 export function includesKeyword(text: string, keyword: string, ignoreCase = true): boolean {
@@ -113,7 +115,7 @@ export function includesKeyword(text: string, keyword: string, ignoreCase = true
     let re = keywordRegexCache.get(cacheKey);
     if (!re) {
         const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const tail = keyword.length <= 4 ? "(?:'?s)?(?![A-Za-z0-9])" : '';
+        const tail = keyword.length <= 4 ? "(?:'?s)?(?![A-Za-z])" : '';
         re = new RegExp(`(?<![A-Za-z0-9])${escaped}${tail}`, ignoreCase ? 'i' : '');
         keywordRegexCache.set(cacheKey, re);
     }

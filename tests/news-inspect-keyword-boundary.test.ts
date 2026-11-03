@@ -26,3 +26,11 @@ describe('英字キーワードの語境界', () => {
         expect(kws.map(k => k.word)).not.toContain('AI');
     });
 });
+
+describe('語境界化で既存の分類を失わない', () => {
+    it('S&P500 は株、スラッシュ無しの通貨ペアは為替に分類される', () => {
+        expect(categorizeArticle('S&P500 hits record high')).toBe('stocks');
+        expect(categorizeArticle('USDJPY jumps to 155')).toBe('fx');
+        expect(categorizeArticle('EURUSD slips')).toBe('fx');
+    });
+});
